@@ -3,7 +3,26 @@
 import { useCallback } from "react";
 import { useChatStore } from "@/stores/chat-store";
 import { extractActionItems } from "@/lib/ai/action-item-parser";
-import type { ActionItem } from "@/stores/chat-store";
+
+/** Read a streaming response body, piping chunks to appendStreamingContent. */
+async function readStream(
+  response: Response,
+  appendStreamingContent: (chunk: string) => void
+): Promise<string> {
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  if (!reader) throw new Error("No response body");
+
+  let fullContent = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    fullContent += chunk;
+    appendStreamingContent(chunk);
+  }
+  return fullContent;
+}
 
 export function useChat(taskId: string) {
   const {
@@ -54,21 +73,7 @@ export function useChat(taskId: string) {
 
         setCurrentBadge(badge);
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) throw new Error("No response body");
-
-        let fullContent = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          fullContent += chunk;
-          appendStreamingContent(chunk);
-        }
+        const fullContent = await readStream(response, appendStreamingContent);
 
         addMessage({
           id: crypto.randomUUID(),
@@ -82,16 +87,18 @@ export function useChat(taskId: string) {
 
         clearStreaming();
 
-        // Extract action items from the completed response
+        // Extract action items and save to DB as microtasks
         const extracted = extractActionItems(fullContent);
         if (extracted.length > 0) {
-          const actionItems: ActionItem[] = extracted.map((text) => ({
-            id: crypto.randomUUID(),
-            text,
-            completed: false,
-            source: "ai" as const,
-          }));
-          useChatStore.getState().addActionItems(taskId, actionItems);
+          for (const text of extracted) {
+            fetch("/api/microtasks", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ taskId, text, source: "ai" }),
+            }).catch((err) =>
+              console.error("Failed to save microtask:", err)
+            );
+          }
         }
       } catch (error) {
         console.error("Failed to send message:", error);
@@ -119,11 +126,77 @@ export function useChat(taskId: string) {
     ]
   );
 
+  /**
+   * Request an AI checklist review for a task before marking it complete.
+   * Streams the review into the chat and returns whether the review passed.
+   */
+  const requestReview = useCallback(
+    async (reviewTaskId: string): Promise<boolean> => {
+      if (isLoading) return false;
+
+      setLoading(true);
+      clearStreaming();
+      setCurrentBadge("Completion Review");
+
+      try {
+        const response = await fetch("/api/chat/review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: reviewTaskId }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Review API error: ${response.status}`);
+        }
+
+        const fullContent = await readStream(response, appendStreamingContent);
+
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: fullContent,
+          agentType: response.headers.get("X-Agent-Type") || "",
+          badge: "Completion Review",
+          createdAt: new Date().toISOString(),
+        });
+
+        clearStreaming();
+
+        // Determine pass/fail from the VERDICT line in the response
+        const passed = fullContent.includes("VERDICT: ALL_PASSED");
+        return passed;
+      } catch (error) {
+        console.error("Failed to run review:", error);
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            "Sorry, the completion review failed. Please try again. " +
+            (error instanceof Error ? error.message : ""),
+          createdAt: new Date().toISOString(),
+        });
+        clearStreaming();
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      isLoading,
+      addMessage,
+      setLoading,
+      appendStreamingContent,
+      setCurrentBadge,
+      clearStreaming,
+    ]
+  );
+
   return {
     messages,
     isLoading,
     streamingContent,
     currentBadge,
     sendMessage,
+    requestReview,
   };
 }

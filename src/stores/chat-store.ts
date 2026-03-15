@@ -24,6 +24,7 @@ interface ChatState {
   activeTaskId: string | null;
   messages: ChatMessage[];
   isLoading: boolean;
+  historyLoading: boolean;
   streamingContent: string;
   currentBadge: string;
   actionItems: Record<string, ActionItem[]>;
@@ -32,6 +33,7 @@ interface ChatState {
   addMessage: (message: ChatMessage) => void;
   setMessages: (messages: ChatMessage[]) => void;
   setLoading: (loading: boolean) => void;
+  setHistoryLoading: (loading: boolean) => void;
   setStreamingContent: (content: string) => void;
   appendStreamingContent: (chunk: string) => void;
   setCurrentBadge: (badge: string) => void;
@@ -46,16 +48,29 @@ export const useChatStore = create<ChatState>((set) => ({
   activeTaskId: null,
   messages: [],
   isLoading: false,
+  historyLoading: false,
   streamingContent: "",
   currentBadge: "",
   actionItems: {},
 
   setActiveTaskId: (activeTaskId) => set({ activeTaskId, messages: [] }),
 
+  setHistoryLoading: (historyLoading) => set({ historyLoading }),
+
   addMessage: (message) =>
-    set((state) => ({
-      messages: [...state.messages, message],
-    })),
+    set((state) => {
+      // Deduplicate: skip if same id OR same role+content already exists
+      // (the latter catches optimistic local adds vs realtime DB inserts)
+      if (
+        state.messages.some(
+          (m) =>
+            m.id === message.id ||
+            (m.role === message.role && m.content === message.content)
+        )
+      )
+        return state;
+      return { messages: [...state.messages, message] };
+    }),
 
   setMessages: (messages) => set({ messages }),
 
