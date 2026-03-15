@@ -80,7 +80,7 @@ export const TASK_GRAPH: TaskDefinition[] = [
       "Design the 4-stage CO2 compression train: E-201 (feed vaporizer, LPS), C-201 through C-204 (compressors, 80% efficiency each), and intercoolers E-202 through E-204 (CW). Also design H2 feed compressor C-205. Determine compression ratios per stage, intercooler duties, and verify the combined feed reaches reactor inlet conditions. Apply 35 kPa pressure drop per HX side.",
     category: "reactor",
     agentType: "aspen",
-    dependencies: ["thermo-method"],
+    dependencies: ["thermo-method", "reactor-design"],
   },
 
   // -- SEPARATION SYSTEM (3) ---------------------------------
@@ -204,7 +204,7 @@ export const TASK_GRAPH: TaskDefinition[] = [
       "Conduct a HAZOP on the reactor system: R-201, E-205 (feed preheater), E-206 (effluent cooler), and C-206 (recycle compressor). For each node, apply guide words (NO, MORE, LESS, AS WELL AS, PART OF, REVERSE, OTHER THAN) to parameters (Flow, T, P, Level, Composition, Phase). Document causes, consequences, existing safeguards, and recommendations with severity/likelihood. This must be improved from the CHEN 4460 version.",
     category: "safety",
     agentType: "safety",
-    dependencies: ["reactor-optimization", "pipe-class-materials"],
+    dependencies: ["reactor-optimization"],
   },
   {
     id: "hazop-column",
@@ -213,7 +213,7 @@ export const TASK_GRAPH: TaskDefinition[] = [
       "Conduct a HAZOP on the product column system: T-201, E-207 (reboiler), E-208 (condenser), V-203 (reflux drum), and P-201 (reflux pump). Apply all guide words to all process parameters. Document causes, consequences, safeguards, and recommendations. This must be improved from the CHEN 4460 version.",
     category: "safety",
     agentType: "safety",
-    dependencies: ["column-design", "pipe-class-materials"],
+    dependencies: ["column-design"],
   },
   {
     id: "safety-review",
