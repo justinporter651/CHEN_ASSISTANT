@@ -13,13 +13,6 @@ interface ChatMessage {
   isStreaming?: boolean;
 }
 
-export interface ActionItem {
-  id: string;
-  text: string;
-  completed: boolean;
-  source: "ai" | "user";
-}
-
 interface ChatState {
   activeTaskId: string | null;
   messages: ChatMessage[];
@@ -27,7 +20,6 @@ interface ChatState {
   historyLoading: boolean;
   streamingContent: string;
   currentBadge: string;
-  actionItems: Record<string, ActionItem[]>;
 
   setActiveTaskId: (taskId: string | null) => void;
   addMessage: (message: ChatMessage) => void;
@@ -38,10 +30,6 @@ interface ChatState {
   appendStreamingContent: (chunk: string) => void;
   setCurrentBadge: (badge: string) => void;
   clearStreaming: () => void;
-  addActionItems: (taskId: string, items: ActionItem[]) => void;
-  toggleActionItem: (taskId: string, itemId: string) => void;
-  removeActionItem: (taskId: string, itemId: string) => void;
-  addManualItem: (taskId: string, text: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -51,8 +39,6 @@ export const useChatStore = create<ChatState>((set) => ({
   historyLoading: false,
   streamingContent: "",
   currentBadge: "",
-  actionItems: {},
-
   setActiveTaskId: (activeTaskId) => set({ activeTaskId, messages: [] }),
 
   setHistoryLoading: (historyLoading) => set({ historyLoading }),
@@ -86,64 +72,4 @@ export const useChatStore = create<ChatState>((set) => ({
   setCurrentBadge: (currentBadge) => set({ currentBadge }),
 
   clearStreaming: () => set({ streamingContent: "", currentBadge: "" }),
-
-  addActionItems: (taskId, items) =>
-    set((state) => {
-      const existing = state.actionItems[taskId] ?? [];
-      const existingTexts = new Set(
-        existing.map((i) => i.text.toLowerCase())
-      );
-      const newItems = items.filter(
-        (i) => !existingTexts.has(i.text.toLowerCase())
-      );
-      return {
-        actionItems: {
-          ...state.actionItems,
-          [taskId]: [...existing, ...newItems],
-        },
-      };
-    }),
-
-  toggleActionItem: (taskId, itemId) =>
-    set((state) => {
-      const items = state.actionItems[taskId];
-      if (!items) return state;
-      return {
-        actionItems: {
-          ...state.actionItems,
-          [taskId]: items.map((i) =>
-            i.id === itemId ? { ...i, completed: !i.completed } : i
-          ),
-        },
-      };
-    }),
-
-  removeActionItem: (taskId, itemId) =>
-    set((state) => {
-      const items = state.actionItems[taskId];
-      if (!items) return state;
-      return {
-        actionItems: {
-          ...state.actionItems,
-          [taskId]: items.filter((i) => i.id !== itemId),
-        },
-      };
-    }),
-
-  addManualItem: (taskId, text) =>
-    set((state) => {
-      const existing = state.actionItems[taskId] ?? [];
-      const newItem: ActionItem = {
-        id: crypto.randomUUID(),
-        text,
-        completed: false,
-        source: "user",
-      };
-      return {
-        actionItems: {
-          ...state.actionItems,
-          [taskId]: [...existing, newItem],
-        },
-      };
-    }),
 }));

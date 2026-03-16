@@ -2,7 +2,6 @@
 
 import { useCallback } from "react";
 import { useChatStore } from "@/stores/chat-store";
-import { extractActionItems } from "@/lib/ai/action-item-parser";
 
 /** Read a streaming response body, piping chunks to appendStreamingContent. */
 async function readStream(
@@ -86,20 +85,6 @@ export function useChat(taskId: string) {
         });
 
         clearStreaming();
-
-        // Extract action items and save to DB as microtasks
-        const extracted = extractActionItems(fullContent);
-        if (extracted.length > 0) {
-          for (const text of extracted) {
-            fetch("/api/microtasks", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ taskId, text, source: "ai" }),
-            }).catch((err) =>
-              console.error("Failed to save microtask:", err)
-            );
-          }
-        }
       } catch (error) {
         console.error("Failed to send message:", error);
         addMessage({

@@ -63,33 +63,10 @@ export async function POST(req: Request) {
       })
     );
 
-    // Load microtasks (action items) for this task
-    const { data: microtasks } = await supabase
-      .from("microtasks")
-      .select("*")
-      .eq("task_id", taskId)
-      .order("created_at", { ascending: true });
-
-    const microtaskList = (microtasks || [])
-      .map(
-        (m: { text: string; completed: boolean; source: string }) =>
-          `- [${m.completed ? "x" : " "}] ${m.text} (${m.source})`
-      )
-      .join("\n");
-
     // Build a review prompt that asks the agent to evaluate conversation completeness
-    let reviewMessage =
+    const reviewMessage =
       `Review the conversation for task "${task.title}" and determine if all requirements are met. ` +
-      `The task requires: ${task.description}\n\n`;
-
-    if (microtaskList) {
-      reviewMessage +=
-        `The team has tracked these action items (microtasks) for this task:\n${microtaskList}\n\n` +
-        `Verify that each unchecked action item has been addressed in the conversation. ` +
-        `If critical items are still unresolved, ask the team to complete them before marking done.\n\n`;
-    }
-
-    reviewMessage +=
+      `The task requires: ${task.description}\n\n` +
       `Evaluate the conversation and project state against the checklist. ` +
       `For each requirement:\n` +
       `- Mark it PASS if the conversation shows it has been addressed\n` +

@@ -16,7 +16,7 @@ import {
   Target,
   ListChecks,
 } from "lucide-react";
-import { ActionItemsPanel } from "./ActionItemsPanel";
+
 
 interface TaskKeyPointsProps {
   taskId: string;
@@ -161,9 +161,6 @@ export function TaskKeyPoints({ taskId, completedIds }: TaskKeyPointsProps) {
               </ul>
             </div>
           )}
-
-          {/* Action items */}
-          <ActionItemsPanel taskId={taskId} />
 
           {/* Unlocks next */}
           {dependents.length > 0 && (
