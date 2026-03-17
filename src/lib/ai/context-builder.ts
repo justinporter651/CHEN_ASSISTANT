@@ -52,7 +52,7 @@ export function buildSpecialistContext(
     context += "== RECENT CONVERSATION ==\n";
     for (const msg of contextMessages) {
       const role = msg.role === "user" ? "Team Member" : `AI (${msg.agent_type || "system"})`;
-      context += `${role}: ${msg.content}\n\n`;
+      context += `${role}: ${msg.content ?? ""}\n\n`;
     }
   }
 
@@ -102,21 +102,21 @@ export function shouldSummarize(messageCount: number): boolean {
 }
 
 export function buildSummaryPrompt(messages: Message[]): string {
-  const oldMessages = messages.slice(0, -MAX_CONTEXT_MESSAGES);
   let prompt = "Summarize the following conversation history in 3-5 bullet points, focusing on:\n";
   prompt += "1. Key design decisions made\n";
   prompt += "2. Important parameters established\n";
   prompt += "3. Outstanding questions or issues\n\n";
   prompt += "CONVERSATION:\n";
 
-  for (const msg of oldMessages) {
+  for (const msg of messages) {
     const role = msg.role === "user" ? "User" : "AI";
+    const content = msg.content ?? "";
     // Truncate long messages for the summary prompt
-    const content =
-      msg.content.length > 200
-        ? msg.content.slice(0, 200) + "..."
-        : msg.content;
-    prompt += `${role}: ${content}\n`;
+    const truncated =
+      content.length > 200
+        ? content.slice(0, 200) + "..."
+        : content;
+    prompt += `${role}: ${truncated}\n`;
   }
 
   return prompt;

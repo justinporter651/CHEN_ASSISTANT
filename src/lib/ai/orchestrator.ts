@@ -116,8 +116,9 @@ export async function classifyMessage(
     }
     const parsed = JSON.parse(jsonMatch[0]);
 
-    const validAgents = parsed.agents.filter(
-      (a: string) => a in AGENT_CONFIGS
+    const agents = Array.isArray(parsed.agents) ? parsed.agents : [];
+    const validAgents = agents.filter(
+      (a: string) => typeof a === "string" && a in AGENT_CONFIGS
     );
 
     // If no valid agents and we have a task, fall back to the task's primary agent
@@ -242,27 +243,36 @@ export async function orchestrate(
   for (const agentType of classification.agents) {
     const config = AGENT_CONFIGS[agentType];
 
-    const knowledge = selectKnowledge(agentType, userMessage);
-    const { text } = await generateText({
-      model,
-      system:
-        INTEGRITY_POLICY +
-        config.systemPrompt +
-        (taskId ? buildTaskContext(taskId) : "") +
-        knowledge +
-        buildSpecialistContext(agentType, recentMessages, projectState, conversationSummary) +
-        (classification.isChecklist
-          ? buildChecklistPrompt(agentType, projectState)
-          : ""),
-      prompt: userMessage,
-      temperature: 1,
-    });
+    try {
+      const knowledge = selectKnowledge(agentType, userMessage);
+      const { text } = await generateText({
+        model,
+        system:
+          INTEGRITY_POLICY +
+          config.systemPrompt +
+          (taskId ? buildTaskContext(taskId) : "") +
+          knowledge +
+          buildSpecialistContext(agentType, recentMessages, projectState, conversationSummary) +
+          (classification.isChecklist
+            ? buildChecklistPrompt(agentType, projectState)
+            : ""),
+        prompt: userMessage,
+        temperature: 1,
+      });
 
-    responses.push({
-      agent: agentType,
-      badge: `${config.icon} ${config.name}`,
-      text,
-    });
+      responses.push({
+        agent: agentType,
+        badge: `${config.icon} ${config.name}`,
+        text,
+      });
+    } catch (err) {
+      console.error(`Multi-agent: ${agentType} failed, skipping:`, err);
+      responses.push({
+        agent: agentType,
+        badge: `${config.icon} ${config.name}`,
+        text: `*${config.name} was unable to respond at this time.*`,
+      });
+    }
   }
 
   const combined = responses

@@ -125,15 +125,17 @@ export const AGENT_CONFIGS: Record<AgentType, AgentConfig> = {
   },
 };
 
+const FALLBACK_CONFIG = AGENT_CONFIGS["design"];
+
 export function getAgentConfig(agentType: AgentType): AgentConfig {
-  return AGENT_CONFIGS[agentType];
+  return AGENT_CONFIGS[agentType] ?? FALLBACK_CONFIG;
 }
 
 export function getAgentBadge(agentType: AgentType): {
   icon: string;
   name: string;
 } {
-  const config = AGENT_CONFIGS[agentType];
+  const config = AGENT_CONFIGS[agentType] ?? FALLBACK_CONFIG;
   return { icon: config.icon, name: config.name };
 }
 

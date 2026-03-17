@@ -48,20 +48,26 @@ export async function POST(req: Request) {
     const clientId = await getClientId(req);
 
     // 1. Save user message to task_messages (always save, even without auth)
-    await supabase.from("task_messages").insert({
+    const { error: insertError } = await supabase.from("task_messages").insert({
       task_id: taskId,
       user_id: userId || null,
       role: "user",
       content: message,
       metadata: { client_id: clientId },
     });
+    if (insertError) {
+      console.error("Failed to save user message:", insertError);
+    }
 
     // 2. Load ALL messages for this task (no limit — token counting drives the window)
-    const { data: recentMessages } = await supabase
+    const { data: recentMessages, error: fetchError } = await supabase
       .from("task_messages")
       .select("*")
       .eq("task_id", taskId)
       .order("created_at", { ascending: false });
+    if (fetchError) {
+      console.error("Failed to load messages:", fetchError);
+    }
 
     const allMessages: Message[] = (recentMessages || [])
       .reverse()
@@ -89,9 +95,12 @@ export async function POST(req: Request) {
     );
 
     // 4. Load project state (shared across all tasks)
-    const { data: stateEntries } = await supabase
+    const { data: stateEntries, error: stateError } = await supabase
       .from("project_state")
       .select("*");
+    if (stateError) {
+      console.error("Failed to load project state:", stateError);
+    }
 
     const projectState: ProjectStateEntry[] = (stateEntries || []).map(
       (s) => ({
