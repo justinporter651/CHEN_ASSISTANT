@@ -99,18 +99,42 @@ export async function POST(req: Request) {
             if (done) {
               // Save the review message to task_messages
               try {
-                await supabase.from("task_messages").insert({
+                const insertPayload = {
                   task_id: taskId,
-                  role: "assistant",
+                  role: "assistant" as const,
                   content: fullText,
                   agent_type: agentType,
                   metadata: {
                     badge: `Completion Review`,
                     is_review: true,
                   },
-                });
+                };
+
+                const { error: insertError } = await supabase
+                  .from("task_messages")
+                  .insert(insertPayload);
+
+                if (insertError) {
+                  console.error(
+                    "Failed to save review message (attempt 1):",
+                    insertError,
+                    { taskId, agentType, contentLength: fullText.length }
+                  );
+                  // Retry once after a brief delay
+                  await new Promise((r) => setTimeout(r, 1000));
+                  const { error: retryError } = await supabase
+                    .from("task_messages")
+                    .insert(insertPayload);
+                  if (retryError) {
+                    console.error(
+                      "Failed to save review message (attempt 2):",
+                      retryError,
+                      { taskId, agentType, contentLength: fullText.length }
+                    );
+                  }
+                }
               } catch (err) {
-                console.error("Failed to save review message:", err);
+                console.error("Unexpected error saving review message:", err);
               }
               controller.close();
               break;
