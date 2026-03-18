@@ -1,6 +1,8 @@
 import { generateText } from "ai";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { insertWithRetry } from "@/lib/supabase/insert-with-retry";
 import { orchestrate } from "@/lib/ai/orchestrator";
 import { model } from "@/lib/ai/provider";
 import { Message, ProjectStateEntry } from "@/lib/ai/types";
@@ -143,14 +145,17 @@ export async function POST(req: Request) {
 
         // Delete old summary if exists
         if (existingSummary) {
-          await supabase
+          const { error: deleteError } = await supabase
             .from("task_messages")
             .delete()
             .eq("id", existingSummary.id);
+          if (deleteError) {
+            console.error("Failed to delete old summary:", deleteError);
+          }
         }
 
         // Save new summary
-        await supabase.from("task_messages").insert({
+        const { error: summaryInsertError } = await supabase.from("task_messages").insert({
           task_id: taskId,
           role: "system",
           content: summaryText,
@@ -159,6 +164,9 @@ export async function POST(req: Request) {
             summarized_count: olderMessages.length,
           },
         });
+        if (summaryInsertError) {
+          console.error("Failed to save new summary:", summaryInsertError);
+        }
 
         conversationSummary = summaryText;
       }
@@ -175,67 +183,31 @@ export async function POST(req: Request) {
       conversationSummary
     );
 
-    // 7. Stream response + save to DB on completion
-    const result = await stream;
-    const encoder = new TextEncoder();
-    let fullText = "";
+    // 7. Stream response; save to DB after response completes via after()
+    const streamResult = await stream;
+    const encodedStream = streamResult.textStream.pipeThrough(new TextEncoderStream());
 
-    const responseStream = result.textStream;
-    const reader = responseStream.getReader();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              try {
-                const insertPayload = {
-                  task_id: taskId,
-                  role: "assistant" as const,
-                  content: fullText,
-                  agent_type: agentType,
-                  metadata: { badge, agents_consulted: agentsConsulted },
-                };
-
-                const { error: saveError } = await supabase
-                  .from("task_messages")
-                  .insert(insertPayload);
-
-                if (saveError) {
-                  console.error(
-                    "Failed to save assistant message:",
-                    saveError,
-                    { taskId, agentType, contentLength: fullText.length }
-                  );
-                  // Retry once after a brief delay
-                  await new Promise((r) => setTimeout(r, 1000));
-                  const { error: retryError } = await supabase
-                    .from("task_messages")
-                    .insert(insertPayload);
-                  if (retryError) {
-                    console.error(
-                      "Retry failed for assistant message insert:",
-                      retryError,
-                      { taskId, agentType, contentLength: fullText.length }
-                    );
-                  }
-                }
-              } catch (err) {
-                console.error("Unexpected error saving assistant message:", err);
-              }
-              controller.close();
-              break;
-            }
-            fullText += value;
-            controller.enqueue(encoder.encode(value));
-          }
-        } catch (err) {
-          controller.error(err);
-        }
-      },
+    after(async () => {
+      try {
+        const fullText = await streamResult.text;
+        await insertWithRetry(
+          supabase,
+          "task_messages",
+          {
+            task_id: taskId,
+            role: "assistant",
+            content: fullText,
+            agent_type: agentType,
+            metadata: { badge, agents_consulted: agentsConsulted },
+          },
+          `assistant message for task ${taskId}`
+        );
+      } catch (err) {
+        console.error("after() DB insert failed:", err);
+      }
     });
 
-    return new Response(readable, {
+    return new Response(encodedStream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "X-Client-Id": clientId,
