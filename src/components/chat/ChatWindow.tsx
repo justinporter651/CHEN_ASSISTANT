@@ -13,6 +13,7 @@ import { CATEGORY_MAP } from "@/lib/tasks/categories";
 import { AGENT_CONFIGS } from "@/lib/ai/specialists";
 import type { AgentType } from "@/lib/ai/types";
 import { Loader2, CheckCircle2 } from "lucide-react";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 
 interface ChatWindowProps {
   taskId: string;
@@ -25,6 +26,7 @@ export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomple
   const { messages, isLoading, streamingContent, currentBadge, sendMessage, requestReview } =
     useChat(taskId);
   const historyLoading = useChatStore((s) => s.historyLoading);
+  const loadingStatus = useChatStore((s) => s.loadingStatus);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const task = TASK_MAP[taskId];
@@ -152,12 +154,9 @@ export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomple
             />
           )}
 
-          {/* Loading indicator -- subtle */}
+          {/* Loading status indicator */}
           {isLoading && !streamingContent && (
-            <div className="flex items-center gap-2 text-muted-foreground/60 text-xs py-1">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Thinking...</span>
-            </div>
+            <ThinkingIndicator status={loadingStatus} taskId={taskId} />
           )}
         </div>
       </ScrollArea>
