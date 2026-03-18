@@ -93,14 +93,25 @@ export function useChat(taskId: string) {
         clearStreaming();
       } catch (error) {
         console.error("Failed to send message:", error);
-        addMessage({
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content:
-            "Sorry, something went wrong. Please try again. " +
-            (error instanceof Error ? error.message : ""),
-          createdAt: new Date().toISOString(),
-        });
+        // If we have partial streamed content, preserve it instead of showing a generic error
+        const partialContent = useChatStore.getState().streamingContent;
+        if (partialContent) {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: partialContent + "\n\n_(Response was interrupted. Please try again.)_",
+            createdAt: new Date().toISOString(),
+          });
+        } else {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content:
+              "Sorry, something went wrong. Please try again. " +
+              (error instanceof Error ? error.message : ""),
+            createdAt: new Date().toISOString(),
+          });
+        }
         clearStreaming();
       } finally {
         setLoadingStatus(null);
@@ -161,14 +172,25 @@ export function useChat(taskId: string) {
         return passed;
       } catch (error) {
         console.error("Failed to run review:", error);
-        addMessage({
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content:
-            "Sorry, the completion review failed. Please try again. " +
-            (error instanceof Error ? error.message : ""),
-          createdAt: new Date().toISOString(),
-        });
+        const partialContent = useChatStore.getState().streamingContent;
+        if (partialContent) {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: partialContent + "\n\n_(Review was interrupted. Please try again.)_",
+            badge: "Completion Review",
+            createdAt: new Date().toISOString(),
+          });
+        } else {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content:
+              "Sorry, the completion review failed. Please try again. " +
+              (error instanceof Error ? error.message : ""),
+            createdAt: new Date().toISOString(),
+          });
+        }
         clearStreaming();
         return false;
       } finally {
