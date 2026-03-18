@@ -189,15 +189,39 @@ export async function POST(req: Request) {
             const { done, value } = await reader.read();
             if (done) {
               try {
-                await supabase.from("task_messages").insert({
+                const insertPayload = {
                   task_id: taskId,
-                  role: "assistant",
+                  role: "assistant" as const,
                   content: fullText,
                   agent_type: agentType,
                   metadata: { badge, agents_consulted: agentsConsulted },
-                });
+                };
+
+                const { error: saveError } = await supabase
+                  .from("task_messages")
+                  .insert(insertPayload);
+
+                if (saveError) {
+                  console.error(
+                    "Failed to save assistant message:",
+                    saveError,
+                    { taskId, agentType, contentLength: fullText.length }
+                  );
+                  // Retry once after a brief delay
+                  await new Promise((r) => setTimeout(r, 1000));
+                  const { error: retryError } = await supabase
+                    .from("task_messages")
+                    .insert(insertPayload);
+                  if (retryError) {
+                    console.error(
+                      "Retry failed for assistant message insert:",
+                      retryError,
+                      { taskId, agentType, contentLength: fullText.length }
+                    );
+                  }
+                }
               } catch (err) {
-                console.error("Failed to save assistant message:", err);
+                console.error("Unexpected error saving assistant message:", err);
               }
               controller.close();
               break;
