@@ -6,7 +6,6 @@ import { insertWithRetry } from "@/lib/supabase/insert-with-retry";
 import { orchestrate } from "@/lib/ai/orchestrator";
 import { model } from "@/lib/ai/provider";
 import { Message, ProjectStateEntry } from "@/lib/ai/types";
-import { TASK_MAP } from "@/lib/tasks/task-graph";
 import { buildSummaryPrompt } from "@/lib/ai/context-builder";
 import {
   estimateTokens,
@@ -14,7 +13,7 @@ import {
   shouldCompact,
 } from "@/lib/ai/token-utils";
 
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 const MAX_RECENT_MESSAGES = 10;
 const ESTIMATED_SYSTEM_PROMPT_TOKENS = 8000;
@@ -176,14 +175,12 @@ export async function POST(req: Request) {
     }
 
     // 6. Orchestrate with task context and optional summary
-    const taskPrimaryAgent = taskId ? TASK_MAP[taskId]?.agentType : undefined;
     const { stream, agentType, agentsConsulted, badge } = await orchestrate(
       message,
       messagesToSend,
       projectState,
       taskId,
-      conversationSummary,
-      taskPrimaryAgent
+      conversationSummary
     );
 
     // 7. Stream response; save to DB after response completes via after()
