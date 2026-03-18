@@ -21,6 +21,7 @@ import {
 interface TaskKeyPointsProps {
   taskId: string;
   completedIds: Set<string>;
+  collapsed?: boolean;
 }
 
 /** Where this task's output goes in the final report */
@@ -38,7 +39,7 @@ const REPORT_DESTINATIONS: Record<string, string[]> = {
   presentations: ["PowerPoint / Poster"],
 };
 
-export function TaskKeyPoints({ taskId, completedIds }: TaskKeyPointsProps) {
+export function TaskKeyPoints({ taskId, completedIds, collapsed }: TaskKeyPointsProps) {
   const task = TASK_MAP[taskId];
 
   const { prerequisites, dependents, reportSections } = useMemo(() => {
@@ -70,7 +71,11 @@ export function TaskKeyPoints({ taskId, completedIds }: TaskKeyPointsProps) {
   const agentConfig = AGENT_CONFIGS[task.agentType as AgentType];
 
   return (
-    <aside className="w-72 border-l bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col h-full">
+    <aside
+      className={`border-l bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col h-full transition-all duration-200 ${
+        collapsed ? "w-0 overflow-hidden border-l-0" : "w-72"
+      }`}
+    >
       <div className="px-4 py-3 border-b">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Task Overview

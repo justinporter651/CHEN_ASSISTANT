@@ -1,18 +1,20 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { TaskKeyPoints } from "@/components/chat/TaskKeyPoints";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useTasks } from "@/hooks/useTasks";
 import { TASK_MAP } from "@/lib/tasks/task-graph";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 
 export default function TaskChatPage() {
   const params = useParams();
   const router = useRouter();
   const taskId = params.taskId as string;
   const { markComplete, markIncomplete, completedIds, categories } = useTasks();
+  const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // Build completedIds set for TaskKeyPoints from resolved categories
   const resolvedCompletedIds = new Set(
@@ -45,7 +47,18 @@ export default function TaskChatPage() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="relative flex-1 flex flex-col min-w-0">
+        <button
+          onClick={() => setRightCollapsed(!rightCollapsed)}
+          className="absolute top-3 right-3 z-10 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title={rightCollapsed ? "Show task overview" : "Hide task overview"}
+        >
+          {rightCollapsed ? (
+            <PanelRightOpen className="h-4 w-4" />
+          ) : (
+            <PanelRightClose className="h-4 w-4" />
+          )}
+        </button>
         <ChatWindow
           taskId={taskId}
           isCompleted={isCompleted}
@@ -53,7 +66,11 @@ export default function TaskChatPage() {
           onMarkIncomplete={() => markIncomplete(taskId)}
         />
       </div>
-      <TaskKeyPoints taskId={taskId} completedIds={resolvedCompletedIds} />
+      <TaskKeyPoints
+        taskId={taskId}
+        completedIds={resolvedCompletedIds}
+        collapsed={rightCollapsed}
+      />
     </div>
   );
 }
