@@ -20,6 +20,7 @@ interface ChatState {
   historyLoading: boolean;
   streamingContent: string;
   currentBadge: string;
+  loadingStatus: string | null;
 
   setActiveTaskId: (taskId: string | null) => void;
   addMessage: (message: ChatMessage) => void;
@@ -29,6 +30,7 @@ interface ChatState {
   setStreamingContent: (content: string) => void;
   appendStreamingContent: (chunk: string) => void;
   setCurrentBadge: (badge: string) => void;
+  setLoadingStatus: (loadingStatus: string | null) => void;
   clearStreaming: () => void;
 }
 
@@ -39,6 +41,7 @@ export const useChatStore = create<ChatState>((set) => ({
   historyLoading: false,
   streamingContent: "",
   currentBadge: "",
+  loadingStatus: null,
   setActiveTaskId: (activeTaskId) => set({ activeTaskId, messages: [] }),
 
   setHistoryLoading: (historyLoading) => set({ historyLoading }),
@@ -70,6 +73,8 @@ export const useChatStore = create<ChatState>((set) => ({
     })),
 
   setCurrentBadge: (currentBadge) => set({ currentBadge }),
+
+  setLoadingStatus: (loadingStatus) => set({ loadingStatus }),
 
   clearStreaming: () => set({ streamingContent: "", currentBadge: "" }),
 }));
