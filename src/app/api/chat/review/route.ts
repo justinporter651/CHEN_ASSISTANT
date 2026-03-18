@@ -4,7 +4,7 @@ import { callSpecialist } from "@/lib/ai/orchestrator";
 import { TASK_MAP } from "@/lib/tasks/task-graph";
 import type { Message, ProjectStateEntry, AgentType } from "@/lib/ai/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * POST /api/chat/review
