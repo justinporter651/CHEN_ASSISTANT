@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callSpecialist } from "@/lib/ai/orchestrator";
 import { TASK_MAP } from "@/lib/tasks/task-graph";
@@ -84,71 +85,48 @@ export async function POST(req: Request) {
       taskId
     );
 
-    const stream = await result;
-    const encoder = new TextEncoder();
-    let fullText = "";
+    const streamResult = await result;
+    const encodedStream = streamResult.textStream.pipeThrough(
+      new TextEncoderStream()
+    );
 
-    const responseStream = stream.textStream;
-    const reader = responseStream.getReader();
-
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              // Save the review message to task_messages
-              try {
-                const insertPayload = {
-                  task_id: taskId,
-                  role: "assistant" as const,
-                  content: fullText,
-                  agent_type: agentType,
-                  metadata: {
-                    badge: `Completion Review`,
-                    is_review: true,
-                  },
-                };
-
-                const { error: insertError } = await supabase
-                  .from("task_messages")
-                  .insert(insertPayload);
-
-                if (insertError) {
-                  console.error(
-                    "Failed to save review message (attempt 1):",
-                    insertError,
-                    { taskId, agentType, contentLength: fullText.length }
-                  );
-                  // Retry once after a brief delay
-                  await new Promise((r) => setTimeout(r, 1000));
-                  const { error: retryError } = await supabase
-                    .from("task_messages")
-                    .insert(insertPayload);
-                  if (retryError) {
-                    console.error(
-                      "Failed to save review message (attempt 2):",
-                      retryError,
-                      { taskId, agentType, contentLength: fullText.length }
-                    );
-                  }
-                }
-              } catch (err) {
-                console.error("Unexpected error saving review message:", err);
-              }
-              controller.close();
-              break;
-            }
-            fullText += value;
-            controller.enqueue(encoder.encode(value));
+    after(async () => {
+      try {
+        const fullText = await streamResult.text;
+        const payload = {
+          task_id: taskId,
+          role: "assistant" as const,
+          content: fullText,
+          agent_type: agentType,
+          metadata: { badge: "Completion Review", is_review: true },
+        };
+        const { error: insertError } = await supabase
+          .from("task_messages")
+          .insert(payload);
+        if (insertError) {
+          console.error("Failed to save review message:", insertError, {
+            taskId,
+            agentType,
+            contentLength: fullText.length,
+          });
+          // Retry once
+          await new Promise((r) => setTimeout(r, 1000));
+          const { error: retryError } = await supabase
+            .from("task_messages")
+            .insert(payload);
+          if (retryError) {
+            console.error("Retry failed for review message:", retryError, {
+              taskId,
+              agentType,
+            });
           }
-        } catch (err) {
-          controller.error(err);
         }
-      },
+      } catch (err) {
+        console.error("after() review DB insert failed:", err);
+      }
     });
 
-    return new Response(readable, {
+    return new Response(encodedStream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "X-Agent-Type": agentType,
