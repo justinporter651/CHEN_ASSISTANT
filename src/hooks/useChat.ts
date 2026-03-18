@@ -27,10 +27,12 @@ export function useChat(taskId: string) {
   const {
     messages,
     isLoading,
+    loadingStatus,
     streamingContent,
     currentBadge,
     addMessage,
     setLoading,
+    setLoadingStatus,
     appendStreamingContent,
     setCurrentBadge,
     clearStreaming,
@@ -52,6 +54,7 @@ export function useChat(taskId: string) {
       addMessage(userMessage);
       setLoading(true);
       clearStreaming();
+      setLoadingStatus("routing");
 
       try {
         const response = await fetch("/api/chat", {
@@ -64,6 +67,8 @@ export function useChat(taskId: string) {
           throw new Error(`Chat API error: ${response.status}`);
         }
 
+        setLoadingStatus("connecting");
+
         const rawBadge = response.headers.get("X-Agent-Badge") || "";
         const badge = decodeURIComponent(rawBadge);
         const agentType = response.headers.get("X-Agent-Type") || "";
@@ -72,6 +77,7 @@ export function useChat(taskId: string) {
 
         setCurrentBadge(badge);
 
+        setLoadingStatus("streaming");
         const fullContent = await readStream(response, appendStreamingContent);
 
         addMessage({
@@ -97,6 +103,7 @@ export function useChat(taskId: string) {
         });
         clearStreaming();
       } finally {
+        setLoadingStatus(null);
         setLoading(false);
       }
     },
@@ -105,6 +112,7 @@ export function useChat(taskId: string) {
       isLoading,
       addMessage,
       setLoading,
+      setLoadingStatus,
       appendStreamingContent,
       setCurrentBadge,
       clearStreaming,
@@ -121,6 +129,7 @@ export function useChat(taskId: string) {
 
       setLoading(true);
       clearStreaming();
+      setLoadingStatus("reviewing");
       setCurrentBadge("Completion Review");
 
       try {
@@ -163,6 +172,7 @@ export function useChat(taskId: string) {
         clearStreaming();
         return false;
       } finally {
+        setLoadingStatus(null);
         setLoading(false);
       }
     },
@@ -170,6 +180,7 @@ export function useChat(taskId: string) {
       isLoading,
       addMessage,
       setLoading,
+      setLoadingStatus,
       appendStreamingContent,
       setCurrentBadge,
       clearStreaming,
@@ -179,6 +190,7 @@ export function useChat(taskId: string) {
   return {
     messages,
     isLoading,
+    loadingStatus,
     streamingContent,
     currentBadge,
     sendMessage,
