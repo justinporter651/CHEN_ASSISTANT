@@ -205,8 +205,29 @@ export async function orchestrate(
   recentMessages: Message[],
   projectState: ProjectStateEntry[],
   taskId?: string,
-  conversationSummary?: string
+  conversationSummary?: string,
+  primaryAgent?: AgentType
 ) {
+  // If a primary agent is specified, skip classification and route directly
+  if (primaryAgent) {
+    const config = AGENT_CONFIGS[primaryAgent];
+    const result = callSpecialist(
+      primaryAgent,
+      userMessage,
+      recentMessages,
+      projectState,
+      false,
+      taskId,
+      conversationSummary
+    );
+    return {
+      stream: result,
+      agentType: primaryAgent,
+      agentsConsulted: [primaryAgent],
+      badge: `${config.icon} ${config.name}`,
+    };
+  }
+
   // Step 1: Classify (with task context)
   const classification = await classifyMessage(
     userMessage,
