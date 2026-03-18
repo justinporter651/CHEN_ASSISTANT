@@ -13,7 +13,7 @@ import {
   shouldCompact,
 } from "@/lib/ai/token-utils";
 
-export const maxDuration = 1200;
+export const maxDuration = 800;
 
 const MAX_RECENT_MESSAGES = 10;
 const ESTIMATED_SYSTEM_PROMPT_TOKENS = 8000;
