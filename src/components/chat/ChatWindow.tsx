@@ -14,6 +14,7 @@ import { AGENT_CONFIGS } from "@/lib/ai/specialists";
 import type { AgentType } from "@/lib/ai/types";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ChatWindowProps {
   taskId: string;
@@ -23,6 +24,7 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomplete }: ChatWindowProps) {
+  const { user, displayName } = useAuth();
   const { messages, isLoading, streamingContent, currentBadge, sendMessage, requestReview } =
     useChat(taskId);
   const historyLoading = useChatStore((s) => s.historyLoading);
@@ -52,7 +54,7 @@ export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomple
     if (attachment) {
       fullMessage = `[Attached PDF: ${attachment.filename}]\n\n--- PDF Content ---\n${attachment.text}\n--- End PDF ---\n\n${content}`;
     }
-    sendMessage(fullMessage, undefined, "Team Member");
+    sendMessage(fullMessage, user?.id, displayName);
   };
 
   if (!task) {

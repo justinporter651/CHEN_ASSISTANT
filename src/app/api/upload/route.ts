@@ -1,3 +1,5 @@
+import { getAuthUser } from "@/lib/supabase/server";
+
 // Import the inner module directly to avoid pdf-parse's index.js "debug mode"
 // bug where it tries to read a test file when module.parent is falsy (common
 // in Next.js bundled environments).
@@ -14,6 +16,11 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
  */
 export async function POST(req: Request) {
   try {
+    // Verify authentication
+    const user = await getAuthUser();
+    if (!user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 

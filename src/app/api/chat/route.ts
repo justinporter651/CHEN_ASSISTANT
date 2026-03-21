@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { headers } from "next/headers";
 import { after } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthUser } from "@/lib/supabase/server";
 import { insertWithRetry } from "@/lib/supabase/insert-with-retry";
 import { orchestrate } from "@/lib/ai/orchestrator";
 import { model } from "@/lib/ai/provider";
@@ -37,7 +37,13 @@ async function getClientId(req: Request): Promise<string> {
 
 export async function POST(req: Request) {
   try {
-    const { message, userId, taskId } = await req.json();
+    // Verify authentication
+    const user = await getAuthUser();
+    if (!user) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const { message, taskId } = await req.json();
 
     if (!message || typeof message !== "string") {
       return new Response("Message is required", { status: 400 });
@@ -49,10 +55,10 @@ export async function POST(req: Request) {
     const supabase = await createServiceClient();
     const clientId = await getClientId(req);
 
-    // 1. Save user message to task_messages (always save, even without auth)
+    // 1. Save user message to task_messages with authenticated user ID
     const { error: insertError } = await supabase.from("task_messages").insert({
       task_id: taskId,
-      user_id: userId || null,
+      user_id: user.id,
       role: "user",
       content: message,
       metadata: { client_id: clientId },

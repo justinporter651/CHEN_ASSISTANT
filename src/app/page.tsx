@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 export default function Home() {
-  // For now, redirect directly to chat
-  // TODO: Add auth check — redirect to /login if not authenticated
+  // Middleware handles auth — if we get here, user is authenticated
   redirect("/chat");
 }

@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, getAuthUser } from "@/lib/supabase/server";
 import { callSpecialist } from "@/lib/ai/orchestrator";
 import { TASK_MAP } from "@/lib/tasks/task-graph";
 import type { Message, ProjectStateEntry, AgentType } from "@/lib/ai/types";
@@ -14,6 +14,12 @@ export const maxDuration = 800;
  */
 export async function POST(req: Request) {
   try {
+    // Verify authentication
+    const user = await getAuthUser();
+    if (!user) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const { taskId } = await req.json();
 
     if (!taskId || typeof taskId !== "string") {

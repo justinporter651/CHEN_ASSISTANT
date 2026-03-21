@@ -5,6 +5,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholde
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key";
 
+/** Cookie-aware Supabase client for Server Components and Route Handlers. */
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
@@ -26,7 +27,18 @@ export async function createServerSupabaseClient() {
   });
 }
 
+/** Service-role client — bypasses RLS. Use for admin operations only. */
 export async function createServiceClient() {
   const { createClient } = await import("@supabase/supabase-js");
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+}
+
+/**
+ * Get the authenticated user from a Route Handler.
+ * Returns the user or null if not authenticated.
+ */
+export async function getAuthUser() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
 }
