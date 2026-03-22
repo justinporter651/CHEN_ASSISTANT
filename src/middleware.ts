@@ -34,8 +34,12 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If not authenticated and not already on login page, redirect to login
-  if (!user && !request.nextUrl.pathname.startsWith("/login")) {
+  // If not authenticated and not on a public route, redirect to login
+  const isPublicRoute =
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/auth/callback");
+
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
