@@ -36,6 +36,7 @@ function LoginForm() {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          shouldCreateUser: false,
         },
       });
       if (error) throw error;
@@ -121,7 +122,9 @@ function LoginForm() {
             </form>
 
             <p className="text-center text-xs text-muted-foreground">
-              Enter your email and we&apos;ll send you a sign-in link.
+              Existing users can sign in with a magic link.
+              <br />
+              New accounts are by invitation only.
             </p>
           </>
         )}
