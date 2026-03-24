@@ -25,12 +25,12 @@ describe("resolveStatus", () => {
     expect(resolveStatus(task, new Set(["t1"]), new Set())).toBe("completed");
   });
 
-  it("returns 'locked' if any dependency is not completed", () => {
+  it("returns 'available' even if dependencies are not completed", () => {
     const task = makeTask({ id: "t2", dependencies: ["t1"] });
-    expect(resolveStatus(task, new Set(), new Set())).toBe("locked");
+    expect(resolveStatus(task, new Set(), new Set())).toBe("available");
   });
 
-  it("returns 'in_progress' if all deps met and has messages", () => {
+  it("returns 'in_progress' if task has messages", () => {
     const task = makeTask({ id: "t2", dependencies: ["t1"] });
     expect(resolveStatus(task, new Set(["t1"]), new Set(["t2"]))).toBe("in_progress");
   });
@@ -53,7 +53,7 @@ describe("resolveStatus", () => {
 
   it("handles undefined in completedIds set gracefully", () => {
     const task = makeTask({ id: "t1", dependencies: ["nonexistent"] });
-    expect(resolveStatus(task, new Set(), new Set())).toBe("locked");
+    expect(resolveStatus(task, new Set(), new Set())).toBe("available");
   });
 });
 
@@ -105,11 +105,10 @@ describe("getOverallProgress", () => {
 });
 
 describe("getAvailableTasks", () => {
-  it("returns foundation tasks when nothing is completed", () => {
+  it("returns all tasks when nothing is completed", () => {
     const available = getAvailableTasks(new Set(), new Set());
-    // Tasks with no dependencies should be available
+    // All tasks should be available since there is no locking
     expect(available.length).toBeGreaterThan(0);
-    expect(available.every((t) => t.dependencies.length === 0)).toBe(true);
   });
 
   it("excludes tasks that already have messages (in_progress)", () => {

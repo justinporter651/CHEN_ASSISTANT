@@ -98,10 +98,6 @@ export default function ChatOverviewPage() {
             ready to work on (click to open)
           </p>
           <p>
-            <span className="font-medium text-foreground">🔒 Locked</span> —
-            waiting on prerequisite tasks
-          </p>
-          <p>
             <span className="font-medium text-foreground">✓ Complete</span> —
             finished, unlocks downstream tasks
           </p>
