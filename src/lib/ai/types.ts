@@ -40,6 +40,13 @@ export interface ClassificationResult {
   isChecklist: boolean;
 }
 
+export interface ImageAttachment {
+  type: "image";
+  dataUrl: string;
+  mediaType: string;
+  filename: string;
+}
+
 export interface Message {
   id: string;
   user_id: string | null;

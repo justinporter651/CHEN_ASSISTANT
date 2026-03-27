@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { FlaskConical, Loader2, Mail, CheckCircle } from "lucide-react";
@@ -8,14 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
-  );
-}
-
-function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +28,6 @@ function LoginForm() {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
-          shouldCreateUser: false,
         },
       });
       if (error) throw error;
@@ -122,9 +113,7 @@ function LoginForm() {
             </form>
 
             <p className="text-center text-xs text-muted-foreground">
-              Existing users can sign in with a magic link.
-              <br />
-              New accounts are by invitation only.
+              Enter your email and we&apos;ll send you a sign-in link.
             </p>
           </>
         )}

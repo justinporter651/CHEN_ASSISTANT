@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { useChatStore } from "@/stores/chat-store";
+import { useChatStore, ChatImageAttachment } from "@/stores/chat-store";
 
 /** Read a streaming response body, piping chunks to appendStreamingContent. */
 async function readStream(
@@ -39,10 +39,10 @@ export function useChat(taskId: string) {
   } = useChatStore();
 
   const sendMessage = useCallback(
-    async (content: string, userId?: string, userName?: string) => {
-      if (!content.trim() || isLoading) return;
+    async (content: string, userId?: string, userName?: string, imageAttachments?: ChatImageAttachment[]) => {
+      if ((!content.trim() && (!imageAttachments || imageAttachments.length === 0)) || isLoading) return;
 
-      // Add user message to UI immediately
+      // Add user message to UI immediately (with attachments for rendering)
       const userMessage = {
         id: crypto.randomUUID(),
         role: "user" as const,
@@ -50,6 +50,7 @@ export function useChat(taskId: string) {
         userId,
         userName,
         createdAt: new Date().toISOString(),
+        attachments: imageAttachments,
       };
       addMessage(userMessage);
       setLoading(true);
@@ -60,7 +61,12 @@ export function useChat(taskId: string) {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: content, userId, taskId }),
+          body: JSON.stringify({
+            message: content,
+            userId,
+            taskId,
+            attachments: imageAttachments,
+          }),
         });
 
         if (!response.ok) {

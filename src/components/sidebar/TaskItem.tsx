@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import type { ResolvedTask } from "@/lib/tasks/dependency-resolver";
-import { Check, Circle, Loader2 } from "lucide-react";
+import { Check, Lock, Circle, Loader2 } from "lucide-react";
 
 interface TaskItemProps {
   task: ResolvedTask;
@@ -30,6 +30,13 @@ const STATUS_CONFIG = {
     iconBg: "bg-zinc-100 dark:bg-zinc-800",
     clickable: true,
   },
+  locked: {
+    icon: Lock,
+    className: "text-zinc-300 dark:text-zinc-600",
+    bgClassName: "opacity-50",
+    iconBg: "bg-zinc-100 dark:bg-zinc-800",
+    clickable: false,
+  },
 };
 
 export function TaskItem({ task }: TaskItemProps) {
@@ -49,7 +56,11 @@ export function TaskItem({ task }: TaskItemProps) {
     <button
       onClick={handleClick}
       disabled={!config.clickable}
-      title={task.title}
+      title={
+        task.status === "locked"
+          ? `Needs: ${task.blockers.join(", ")}`
+          : task.title
+      }
       className={`
         w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors
         ${config.bgClassName}
@@ -68,7 +79,9 @@ export function TaskItem({ task }: TaskItemProps) {
         className={`truncate ${
           task.status === "completed"
             ? "line-through text-muted-foreground"
-            : "text-foreground"
+            : task.status === "locked"
+              ? "text-muted-foreground/50"
+              : "text-foreground"
         }`}
       >
         {task.title}

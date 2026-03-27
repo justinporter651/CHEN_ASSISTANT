@@ -5,7 +5,7 @@ import { createServiceClient, getAuthUser } from "@/lib/supabase/server";
 import { insertWithRetry } from "@/lib/supabase/insert-with-retry";
 import { orchestrate } from "@/lib/ai/orchestrator";
 import { model } from "@/lib/ai/provider";
-import { Message, ProjectStateEntry } from "@/lib/ai/types";
+import { ImageAttachment, Message, ProjectStateEntry } from "@/lib/ai/types";
 import { buildSummaryPrompt } from "@/lib/ai/context-builder";
 import {
   estimateTokens,
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const { message, taskId } = await req.json();
+    const { message, taskId, attachments: rawAttachments } = await req.json();
 
     if (!message || typeof message !== "string") {
       return new Response("Message is required", { status: 400 });
@@ -52,16 +52,41 @@ export async function POST(req: Request) {
       return new Response("Task ID is required", { status: 400 });
     }
 
+    // Validate and sanitize image attachments
+    const attachments: ImageAttachment[] = Array.isArray(rawAttachments)
+      ? rawAttachments
+          .filter(
+            (a: unknown): a is ImageAttachment =>
+              typeof a === "object" &&
+              a !== null &&
+              (a as Record<string, unknown>).type === "image" &&
+              typeof (a as Record<string, unknown>).dataUrl === "string" &&
+              typeof (a as Record<string, unknown>).mediaType === "string" &&
+              typeof (a as Record<string, unknown>).filename === "string"
+          )
+          .slice(0, 4) // Max 4 images per message
+      : [];
+
     const supabase = await createServiceClient();
     const clientId = await getClientId(req);
 
     // 1. Save user message to task_messages with authenticated user ID
+    // Store image metadata (not base64 data) so we know images were attached
+    const imageMetadata = attachments.length > 0
+      ? {
+          attachments: attachments.map((a) => ({
+            mediaType: a.mediaType,
+            filename: a.filename,
+            hasImage: true,
+          })),
+        }
+      : {};
     const { error: insertError } = await supabase.from("task_messages").insert({
       task_id: taskId,
       user_id: user.id,
       role: "user",
       content: message,
-      metadata: { client_id: clientId },
+      metadata: { client_id: clientId, ...imageMetadata },
     });
     if (insertError) {
       console.error("Failed to save user message:", insertError);
@@ -186,7 +211,9 @@ export async function POST(req: Request) {
       messagesToSend,
       projectState,
       taskId,
-      conversationSummary
+      conversationSummary,
+      undefined, // primaryAgent
+      attachments.length > 0 ? attachments : undefined
     );
 
     // 7. Stream response; save to DB after response completes via after()

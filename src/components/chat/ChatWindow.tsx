@@ -5,7 +5,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { MessageBubble } from "./MessageBubble";
 import { AgentBadge } from "./AgentBadge";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, ImagePayload } from "./ChatInput";
+import { ImageAttachmentDisplay } from "./ImageAttachment";
+import type { ChatImageAttachment } from "@/stores/chat-store";
 import { useChat } from "@/hooks/useChat";
 import { useChatStore } from "@/stores/chat-store";
 import { TASK_MAP } from "@/lib/tasks/task-graph";
@@ -48,13 +50,26 @@ export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomple
     }
   }, [messages, streamingContent]);
 
-  const handleSend = (content: string, attachment?: { filename: string; text: string }) => {
+  const handleSend = (
+    content: string,
+    pdfAttachment?: { filename: string; text: string },
+    imageAttachments?: ImagePayload[]
+  ) => {
     // If a PDF is attached, prepend its content to the message
     let fullMessage = content;
-    if (attachment) {
-      fullMessage = `[Attached PDF: ${attachment.filename}]\n\n--- PDF Content ---\n${attachment.text}\n--- End PDF ---\n\n${content}`;
+    if (pdfAttachment) {
+      fullMessage = `[Attached PDF: ${pdfAttachment.filename}]\n\n--- PDF Content ---\n${pdfAttachment.text}\n--- End PDF ---\n\n${content}`;
     }
-    sendMessage(fullMessage, user?.id, displayName);
+
+    // Convert ImagePayload to ChatImageAttachment
+    const chatImages: ChatImageAttachment[] | undefined = imageAttachments?.map((img) => ({
+      type: "image" as const,
+      dataUrl: img.dataUrl,
+      mediaType: img.mediaType,
+      filename: img.filename,
+    }));
+
+    sendMessage(fullMessage, user?.id, displayName, chatImages);
   };
 
   if (!task) {
@@ -135,15 +150,29 @@ export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomple
 
           {/* Message list */}
           {messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              role={msg.role}
-              content={msg.content}
-              userName={msg.userName}
-              agentType={msg.agentType}
-              badge={msg.badge}
-              createdAt={msg.createdAt}
-            />
+            <div key={msg.id}>
+              {/* Show image attachments above the message bubble */}
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-1 justify-end">
+                  {msg.attachments.map((att, i) => (
+                    <ImageAttachmentDisplay
+                      key={i}
+                      dataUrl={att.dataUrl}
+                      filename={att.filename}
+                      mediaType={att.mediaType}
+                    />
+                  ))}
+                </div>
+              )}
+              <MessageBubble
+                role={msg.role}
+                content={msg.content}
+                userName={msg.userName}
+                agentType={msg.agentType}
+                badge={msg.badge}
+                createdAt={msg.createdAt}
+              />
+            </div>
           ))}
 
           {/* Streaming response */}

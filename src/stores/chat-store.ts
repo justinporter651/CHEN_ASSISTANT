@@ -2,6 +2,13 @@ import { create } from "zustand";
 
 export type LoadingStatus = "routing" | "connecting" | "streaming" | "reviewing";
 
+export interface ChatImageAttachment {
+  type: "image";
+  dataUrl: string;
+  mediaType: string;
+  filename: string;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -13,6 +20,7 @@ interface ChatMessage {
   userName?: string;
   createdAt: string;
   isStreaming?: boolean;
+  attachments?: ChatImageAttachment[];
 }
 
 interface ChatState {

@@ -10,6 +10,7 @@ import {
 import {
   AgentType,
   ClassificationResult,
+  ImageAttachment,
   Message,
   ProjectStateEntry,
 } from "./types";
@@ -151,6 +152,40 @@ export async function classifyMessage(
  * Call a specialist agent with scoped context and stream the response.
  * Now includes task context so the specialist knows the deliverable.
  */
+/**
+ * Build multimodal message content array when images are present.
+ * Returns a content array with text + image parts for the AI SDK.
+ */
+function buildMultimodalContent(
+  userMessage: string,
+  attachments?: ImageAttachment[]
+): string | Array<{ type: "text"; text: string } | { type: "image"; image: string; mimeType: string }> {
+  if (!attachments || attachments.length === 0) {
+    return userMessage;
+  }
+
+  const parts: Array<{ type: "text"; text: string } | { type: "image"; image: string; mimeType: string }> = [];
+
+  // Add text part first
+  if (userMessage.trim()) {
+    parts.push({ type: "text", text: userMessage });
+  }
+
+  // Add image parts — extract raw base64 from data URL
+  for (const att of attachments) {
+    const base64Match = att.dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+    if (base64Match) {
+      parts.push({
+        type: "image",
+        image: base64Match[1],
+        mimeType: att.mediaType,
+      });
+    }
+  }
+
+  return parts.length > 0 ? parts : userMessage;
+}
+
 export function callSpecialist(
   agentType: AgentType,
   userMessage: string,
@@ -158,7 +193,8 @@ export function callSpecialist(
   projectState: ProjectStateEntry[],
   isChecklist: boolean,
   taskId?: string,
-  conversationSummary?: string
+  conversationSummary?: string,
+  attachments?: ImageAttachment[]
 ) {
   const config = AGENT_CONFIGS[agentType];
   const context = buildSpecialistContext(
@@ -188,6 +224,18 @@ export function callSpecialist(
 
   systemPrompt += `\n\n${context}`;
 
+  // When images are attached, use messages array with multimodal content;
+  // otherwise use simple prompt string
+  if (attachments && attachments.length > 0) {
+    const content = buildMultimodalContent(userMessage, attachments);
+    return streamText({
+      model,
+      system: systemPrompt,
+      messages: [{ role: "user" as const, content: content as Array<{ type: "text"; text: string } | { type: "image"; image: string; mimeType: string }> }],
+      temperature: 1,
+    });
+  }
+
   return streamText({
     model,
     system: systemPrompt,
@@ -206,7 +254,8 @@ export async function orchestrate(
   projectState: ProjectStateEntry[],
   taskId?: string,
   conversationSummary?: string,
-  primaryAgent?: AgentType
+  primaryAgent?: AgentType,
+  attachments?: ImageAttachment[]
 ) {
   // If a primary agent is specified, skip classification and route directly
   if (primaryAgent) {
@@ -218,7 +267,8 @@ export async function orchestrate(
       projectState,
       false,
       taskId,
-      conversationSummary
+      conversationSummary,
+      attachments
     );
     return {
       stream: result,
@@ -247,7 +297,8 @@ export async function orchestrate(
       projectState,
       classification.isChecklist,
       taskId,
-      conversationSummary
+      conversationSummary,
+      attachments
     );
 
     return {
@@ -261,25 +312,43 @@ export async function orchestrate(
   // Step 3: Multi-agent — collect responses and combine
   const responses: { agent: AgentType; badge: string; text: string }[] = [];
 
-  for (const agentType of classification.agents) {
+  for (let i = 0; i < classification.agents.length; i++) {
+    const agentType = classification.agents[i];
     const config = AGENT_CONFIGS[agentType];
+    // Only include images in the first specialist call
+    const agentAttachments = i === 0 ? attachments : undefined;
 
     try {
       const knowledge = selectKnowledge(agentType, userMessage);
-      const { text } = await generateText({
-        model,
-        system:
-          INTEGRITY_POLICY +
-          config.systemPrompt +
-          (taskId ? buildTaskContext(taskId) : "") +
-          knowledge +
-          buildSpecialistContext(agentType, recentMessages, projectState, conversationSummary) +
-          (classification.isChecklist
-            ? buildChecklistPrompt(agentType, projectState)
-            : ""),
-        prompt: userMessage,
-        temperature: 1,
-      });
+
+      // Build multimodal content for first agent if images are present
+      const multimodalContent = agentAttachments && agentAttachments.length > 0
+        ? buildMultimodalContent(userMessage, agentAttachments)
+        : undefined;
+
+      const systemPromptMulti =
+        INTEGRITY_POLICY +
+        config.systemPrompt +
+        (taskId ? buildTaskContext(taskId) : "") +
+        knowledge +
+        buildSpecialistContext(agentType, recentMessages, projectState, conversationSummary) +
+        (classification.isChecklist
+          ? buildChecklistPrompt(agentType, projectState)
+          : "");
+
+      const { text } = multimodalContent
+        ? await generateText({
+            model,
+            system: systemPromptMulti,
+            messages: [{ role: "user" as const, content: multimodalContent as Array<{ type: "text"; text: string } | { type: "image"; image: string; mimeType: string }> }],
+            temperature: 1,
+          })
+        : await generateText({
+            model,
+            system: systemPromptMulti,
+            prompt: userMessage,
+            temperature: 1,
+          });
 
       responses.push({
         agent: agentType,

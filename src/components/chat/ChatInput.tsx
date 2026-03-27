@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useRef, KeyboardEvent } from "react";
-import { ArrowUp, Paperclip, X, FileText, Loader2 } from "lucide-react";
+import { ArrowUp, Paperclip, X, FileText, Loader2, ImageIcon } from "lucide-react";
 
-interface Attachment {
+const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_IMAGES_PER_MESSAGE = 4;
+
+interface PdfAttachment {
+  kind: "pdf";
   file: File;
   name: string;
   extractedText?: string;
@@ -11,8 +16,30 @@ interface Attachment {
   error?: string;
 }
 
+interface ImageAttachmentLocal {
+  kind: "image";
+  file: File;
+  name: string;
+  dataUrl: string;
+  mediaType: string;
+  error?: string;
+}
+
+type Attachment = PdfAttachment | ImageAttachmentLocal;
+
+export interface ImagePayload {
+  type: "image";
+  dataUrl: string;
+  mediaType: string;
+  filename: string;
+}
+
 interface ChatInputProps {
-  onSend: (message: string, attachment?: { filename: string; text: string }) => void;
+  onSend: (
+    message: string,
+    pdfAttachment?: { filename: string; text: string },
+    imageAttachments?: ImagePayload[]
+  ) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -23,38 +50,55 @@ export function ChatInput({
   placeholder = "Ask anything about your design project...",
 }: ChatInputProps) {
   const [input, setInput] = useState("");
-  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const pdfAttachment = attachments.find((a): a is PdfAttachment => a.kind === "pdf");
+  const imageAttachments = attachments.filter((a): a is ImageAttachmentLocal => a.kind === "image");
+
+  const isExtracting = pdfAttachment?.extracting;
+
   const handleSend = async () => {
     if (disabled) return;
-    if (!input.trim() && !attachment) return;
+    if (!input.trim() && attachments.length === 0) return;
 
-    // If there's an attachment that hasn't been extracted yet, extract first
-    if (attachment && !attachment.extractedText && !attachment.error) {
-      await extractPdf(attachment.file);
+    // If there's a PDF that hasn't been extracted yet, extract first
+    if (pdfAttachment && !pdfAttachment.extractedText && !pdfAttachment.error) {
+      await extractPdf(pdfAttachment.file);
       return;
     }
 
-    // If extraction failed, don't send
-    if (attachment?.error) return;
+    // If PDF extraction failed, don't send
+    if (pdfAttachment?.error) return;
 
-    const attachmentData = attachment?.extractedText
-      ? { filename: attachment.name, text: attachment.extractedText }
+    // Check for image errors
+    if (imageAttachments.some((a) => a.error)) return;
+
+    const pdfData = pdfAttachment?.extractedText
+      ? { filename: pdfAttachment.name, text: pdfAttachment.extractedText }
       : undefined;
 
-    onSend(input.trim(), attachmentData);
+    const imageData: ImagePayload[] = imageAttachments.map((a) => ({
+      type: "image",
+      dataUrl: a.dataUrl,
+      mediaType: a.mediaType,
+      filename: a.name,
+    }));
+
+    onSend(input.trim(), pdfData, imageData.length > 0 ? imageData : undefined);
     setInput("");
-    setAttachment(null);
+    setAttachments([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
   };
 
   const extractPdf = async (file: File) => {
-    setAttachment((prev) =>
-      prev ? { ...prev, extracting: true, error: undefined } : null
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.kind === "pdf" ? { ...a, extracting: true, error: undefined } : a
+      )
     );
 
     try {
@@ -69,31 +113,39 @@ export function ChatInput({
       const result = await response.json();
 
       if (!response.ok) {
-        setAttachment((prev) =>
-          prev
-            ? { ...prev, extracting: false, error: result.error }
-            : null
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.kind === "pdf" ? { ...a, extracting: false, error: result.error } : a
+          )
         );
         return;
       }
 
-      setAttachment((prev) =>
-        prev
-          ? {
-              ...prev,
-              extracting: false,
-              extractedText: result.text,
-            }
-          : null
+      setAttachments((prev) =>
+        prev.map((a) =>
+          a.kind === "pdf"
+            ? { ...a, extracting: false, extractedText: result.text }
+            : a
+        )
       );
     } catch {
-      setAttachment((prev) =>
-        prev
-          ? { ...prev, extracting: false, error: "Failed to process PDF" }
-          : null
+      setAttachments((prev) =>
+        prev.map((a) =>
+          a.kind === "pdf"
+            ? { ...a, extracting: false, error: "Failed to process PDF" }
+            : a
+        )
       );
     }
   };
+
+  const readImageAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read image"));
+      reader.readAsDataURL(file);
+    });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -102,26 +154,61 @@ export function ChatInput({
     // Reset file input so the same file can be re-selected
     e.target.value = "";
 
-    if (file.type !== "application/pdf") {
-      setAttachment({
-        file,
-        name: file.name,
-        error: "Only PDF files are supported",
-      });
+    // PDF handling
+    if (file.type === "application/pdf") {
+      if (file.size > 20 * 1024 * 1024) {
+        setAttachments((prev) => [
+          ...prev.filter((a) => a.kind !== "pdf"),
+          { kind: "pdf", file, name: file.name, error: "File too large (max 20MB)" },
+        ]);
+        return;
+      }
+      // Remove any existing PDF, add new one
+      setAttachments((prev) => [
+        ...prev.filter((a) => a.kind !== "pdf"),
+        { kind: "pdf", file, name: file.name },
+      ]);
+      await extractPdf(file);
       return;
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      setAttachment({
-        file,
-        name: file.name,
-        error: "File too large (max 20MB)",
-      });
+    // Image handling
+    if (IMAGE_MIME_TYPES.includes(file.type)) {
+      if (imageAttachments.length >= MAX_IMAGES_PER_MESSAGE) {
+        return; // silently ignore if at limit
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        setAttachments((prev) => [
+          ...prev,
+          { kind: "image", file, name: file.name, dataUrl: "", mediaType: file.type, error: "Image too large (max 10MB)" },
+        ]);
+        return;
+      }
+
+      try {
+        const dataUrl = await readImageAsDataUrl(file);
+        setAttachments((prev) => [
+          ...prev,
+          { kind: "image", file, name: file.name, dataUrl, mediaType: file.type },
+        ]);
+      } catch {
+        setAttachments((prev) => [
+          ...prev,
+          { kind: "image", file, name: file.name, dataUrl: "", mediaType: file.type, error: "Failed to read image" },
+        ]);
+      }
       return;
     }
 
-    setAttachment({ file, name: file.name });
-    await extractPdf(file);
+    // Unsupported file type
+    setAttachments((prev) => [
+      ...prev,
+      { kind: "pdf", file, name: file.name, error: "Only PDF and image files are supported" } as PdfAttachment,
+    ]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -139,60 +226,79 @@ export function ChatInput({
     }
   };
 
-  const hasContent = input.trim().length > 0 || (attachment?.extractedText != null);
+  const hasContent =
+    input.trim().length > 0 ||
+    pdfAttachment?.extractedText != null ||
+    imageAttachments.some((a) => !a.error);
 
   return (
     <div className="border-t border-border/50 bg-background px-4 py-3">
       <div className="max-w-4xl mx-auto">
-        {/* Attachment preview */}
-        {attachment && (
-          <div
-            className={`flex items-center gap-2 mb-2 px-3 py-2 rounded-lg border text-xs ${
-              attachment.error
-                ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-                : attachment.extractedText
-                  ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-                  : "border-border bg-muted/30"
-            }`}
-          >
-            {attachment.extracting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
-            ) : (
-              <FileText
-                className={`h-3.5 w-3.5 shrink-0 ${
-                  attachment.error
-                    ? "text-red-500"
-                    : attachment.extractedText
-                      ? "text-green-500"
-                      : "text-muted-foreground"
+        {/* Attachment previews */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {attachments.map((att, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${
+                  att.error
+                    ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                    : att.kind === "pdf" && att.extractedText
+                      ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
+                      : att.kind === "image" && att.dataUrl
+                        ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"
+                        : "border-border bg-muted/30"
                 }`}
-              />
-            )}
-            <span className="truncate flex-1">
-              {attachment.name}
-              {attachment.extracting && (
-                <span className="text-muted-foreground ml-1">
-                  — Extracting text...
+              >
+                {att.kind === "pdf" && att.extracting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
+                ) : att.kind === "image" ? (
+                  att.dataUrl && !att.error ? (
+                    <img
+                      src={att.dataUrl}
+                      alt={att.name}
+                      className="h-8 w-8 rounded object-cover shrink-0"
+                    />
+                  ) : (
+                    <ImageIcon
+                      className={`h-3.5 w-3.5 shrink-0 ${att.error ? "text-red-500" : "text-muted-foreground"}`}
+                    />
+                  )
+                ) : (
+                  <FileText
+                    className={`h-3.5 w-3.5 shrink-0 ${
+                      att.error
+                        ? "text-red-500"
+                        : att.kind === "pdf" && att.extractedText
+                          ? "text-green-500"
+                          : "text-muted-foreground"
+                    }`}
+                  />
+                )}
+                <span className="truncate max-w-[150px]">
+                  {att.name}
+                  {att.kind === "pdf" && att.extracting && (
+                    <span className="text-muted-foreground ml-1">— Extracting...</span>
+                  )}
+                  {att.kind === "pdf" && att.extractedText && (
+                    <span className="text-green-600 dark:text-green-400 ml-1">— Ready</span>
+                  )}
+                  {att.kind === "image" && !att.error && att.dataUrl && (
+                    <span className="text-blue-600 dark:text-blue-400 ml-1">— Ready</span>
+                  )}
+                  {att.error && (
+                    <span className="text-red-500 ml-1">— {att.error}</span>
+                  )}
                 </span>
-              )}
-              {attachment.extractedText && (
-                <span className="text-green-600 dark:text-green-400 ml-1">
-                  — Ready
-                </span>
-              )}
-              {attachment.error && (
-                <span className="text-red-500 ml-1">
-                  — {attachment.error}
-                </span>
-              )}
-            </span>
-            <button
-              onClick={() => setAttachment(null)}
-              className="shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-              aria-label="Remove attachment"
-            >
-              <X className="h-3 w-3" />
-            </button>
+                <button
+                  onClick={() => removeAttachment(i)}
+                  className="shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                  aria-label="Remove attachment"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -200,17 +306,17 @@ export function ChatInput({
           {/* File upload button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || !!attachment?.extracting}
+            disabled={disabled || !!isExtracting}
             className="shrink-0 m-2 mb-2.5 p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
-            aria-label="Attach PDF"
-            title="Attach PDF"
+            aria-label="Attach file"
+            title="Attach PDF or image"
           >
             <Paperclip className="h-4 w-4" />
           </button>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,image/gif"
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -230,7 +336,7 @@ export function ChatInput({
           />
           <button
             onClick={handleSend}
-            disabled={!hasContent || disabled || !!attachment?.extracting}
+            disabled={!hasContent || disabled || !!isExtracting}
             className="shrink-0 m-2 h-7 w-7 rounded-lg bg-foreground text-background flex items-center justify-center disabled:opacity-20 hover:opacity-80 transition-opacity"
           >
             <ArrowUp className="h-4 w-4" />

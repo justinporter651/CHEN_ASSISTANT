@@ -1,7 +1,7 @@
 import { TASK_GRAPH, TASK_MAP, type TaskDefinition } from "./task-graph";
 import { CATEGORIES } from "./categories";
 
-export type TaskStatus = "available" | "in_progress" | "completed";
+export type TaskStatus = "locked" | "available" | "in_progress" | "completed";
 
 export interface ResolvedTask extends TaskDefinition {
   status: TaskStatus;
@@ -32,6 +32,9 @@ export function resolveStatus(
   tasksWithMessages: Set<string>
 ): TaskStatus {
   if (completedIds.has(task.id)) return "completed";
+
+  const allDepsMet = task.dependencies.every((dep) => completedIds.has(dep));
+  if (!allDepsMet) return "locked";
 
   if (tasksWithMessages.has(task.id)) return "in_progress";
 
