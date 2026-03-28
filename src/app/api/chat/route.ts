@@ -155,54 +155,11 @@ export async function POST(req: Request) {
 
     let conversationSummary: string | undefined = existingSummary?.content;
     let messagesToSend = chatMessages;
+    let needsCompaction = false;
 
     if (shouldCompact(totalEstimate) && chatMessages.length > MAX_RECENT_MESSAGES) {
-      const olderMessages = chatMessages.slice(0, -MAX_RECENT_MESSAGES);
-      const existingSummarizedCount =
-        (existingSummary?.metadata as Record<string, unknown>)
-          ?.summarized_count as number | undefined;
-
-      // Only regenerate summary if new older messages exist since last summary
-      const needsNewSummary =
-        !existingSummary || existingSummarizedCount !== olderMessages.length;
-
-      if (needsNewSummary) {
-        const summaryPrompt = buildSummaryPrompt(olderMessages);
-        const { text: summaryText } = await generateText({
-          model,
-          prompt: summaryPrompt,
-          temperature: 1,
-        });
-
-        // Delete old summary if exists
-        if (existingSummary) {
-          const { error: deleteError } = await supabase
-            .from("task_messages")
-            .delete()
-            .eq("id", existingSummary.id);
-          if (deleteError) {
-            console.error("Failed to delete old summary:", deleteError);
-          }
-        }
-
-        // Save new summary
-        const { error: summaryInsertError } = await supabase.from("task_messages").insert({
-          task_id: taskId,
-          role: "system",
-          content: summaryText,
-          metadata: {
-            type: "context_summary",
-            summarized_count: olderMessages.length,
-          },
-        });
-        if (summaryInsertError) {
-          console.error("Failed to save new summary:", summaryInsertError);
-        }
-
-        conversationSummary = summaryText;
-      }
-
       messagesToSend = chatMessages.slice(-MAX_RECENT_MESSAGES);
+      needsCompaction = true;
     }
 
     // 6. Orchestrate with task context and optional summary
@@ -235,8 +192,51 @@ export async function POST(req: Request) {
           },
           `assistant message for task ${taskId}`
         );
+
+        // Run context compaction in background after response is sent
+        if (needsCompaction) {
+          const olderMessages = chatMessages.slice(0, -MAX_RECENT_MESSAGES);
+          const existingSummarizedCount =
+            (existingSummary?.metadata as Record<string, unknown>)
+              ?.summarized_count as number | undefined;
+
+          const needsNewSummary =
+            !existingSummary || existingSummarizedCount !== olderMessages.length;
+
+          if (needsNewSummary) {
+            const summaryPrompt = buildSummaryPrompt(olderMessages);
+            const { text: summaryText } = await generateText({
+              model,
+              prompt: summaryPrompt,
+              temperature: 1,
+            });
+
+            if (existingSummary) {
+              const { error: deleteError } = await supabase
+                .from("task_messages")
+                .delete()
+                .eq("id", existingSummary.id);
+              if (deleteError) {
+                console.error("Failed to delete old summary:", deleteError);
+              }
+            }
+
+            const { error: summaryInsertError } = await supabase.from("task_messages").insert({
+              task_id: taskId,
+              role: "system",
+              content: summaryText,
+              metadata: {
+                type: "context_summary",
+                summarized_count: olderMessages.length,
+              },
+            });
+            if (summaryInsertError) {
+              console.error("Failed to save new summary:", summaryInsertError);
+            }
+          }
+        }
       } catch (err) {
-        console.error("after() DB insert failed:", err);
+        console.error("after() callback failed:", err);
       }
     });
 

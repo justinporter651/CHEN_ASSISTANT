@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { useChatStore } from "@/stores/chat-store";
 import { supabase, isPlaceholder } from "@/lib/supabase/client";
 
+const PAGE_SIZE = 50;
+
 /** Map a Supabase row to the ChatMessage shape used by the store. */
 function rowToMessage(row: Record<string, unknown>) {
   const metadata = (row.metadata ?? {}) as Record<string, unknown>;
@@ -55,7 +57,8 @@ export function useRealtimeMessages(taskId: string | null) {
           .from("task_messages")
           .select("*")
           .eq("task_id", taskId)
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: false })
+          .limit(PAGE_SIZE);
 
         // Don't update state if the taskId changed while we were loading
         if (cancelled || currentTaskIdRef.current !== taskId) return;
@@ -68,6 +71,7 @@ export function useRealtimeMessages(taskId: string | null) {
 
         // Filter out internal system messages (e.g. context summaries) and map to chat shape
         const messages = (data ?? [])
+          .reverse()
           .filter((row) => {
             const meta = (row.metadata ?? {}) as Record<string, unknown>;
             return meta.type !== "context_summary";

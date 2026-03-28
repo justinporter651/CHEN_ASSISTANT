@@ -309,61 +309,60 @@ export async function orchestrate(
     };
   }
 
-  // Step 3: Multi-agent — collect responses and combine
-  const responses: { agent: AgentType; badge: string; text: string }[] = [];
-
-  for (let i = 0; i < classification.agents.length; i++) {
-    const agentType = classification.agents[i];
+  // Step 3: Multi-agent — collect responses in parallel and combine
+  const agentPromises = classification.agents.map((agentType, i) => {
     const config = AGENT_CONFIGS[agentType];
     // Only include images in the first specialist call
     const agentAttachments = i === 0 ? attachments : undefined;
 
-    try {
-      const knowledge = selectKnowledge(agentType, userMessage);
+    const knowledge = selectKnowledge(agentType, userMessage);
 
-      // Build multimodal content for first agent if images are present
-      const multimodalContent = agentAttachments && agentAttachments.length > 0
-        ? buildMultimodalContent(userMessage, agentAttachments)
-        : undefined;
+    // Build multimodal content for first agent if images are present
+    const multimodalContent = agentAttachments && agentAttachments.length > 0
+      ? buildMultimodalContent(userMessage, agentAttachments)
+      : undefined;
 
-      const systemPromptMulti =
-        INTEGRITY_POLICY +
-        config.systemPrompt +
-        (taskId ? buildTaskContext(taskId) : "") +
-        knowledge +
-        buildSpecialistContext(agentType, recentMessages, projectState, conversationSummary) +
-        (classification.isChecklist
-          ? buildChecklistPrompt(agentType, projectState)
-          : "");
+    const systemPromptMulti =
+      INTEGRITY_POLICY +
+      config.systemPrompt +
+      (taskId ? buildTaskContext(taskId) : "") +
+      knowledge +
+      buildSpecialistContext(agentType, recentMessages, projectState, conversationSummary) +
+      (classification.isChecklist
+        ? buildChecklistPrompt(agentType, projectState)
+        : "");
 
-      const { text } = multimodalContent
-        ? await generateText({
-            model,
-            system: systemPromptMulti,
-            messages: [{ role: "user" as const, content: multimodalContent as Array<{ type: "text"; text: string } | { type: "image"; image: string; mimeType: string }> }],
-            temperature: 1,
-          })
-        : await generateText({
-            model,
-            system: systemPromptMulti,
-            prompt: userMessage,
-            temperature: 1,
-          });
+    const textPromise = multimodalContent
+      ? generateText({
+          model,
+          system: systemPromptMulti,
+          messages: [{ role: "user" as const, content: multimodalContent as Array<{ type: "text"; text: string } | { type: "image"; image: string; mimeType: string }> }],
+          temperature: 1,
+        })
+      : generateText({
+          model,
+          system: systemPromptMulti,
+          prompt: userMessage,
+          temperature: 1,
+        });
 
-      responses.push({
-        agent: agentType,
-        badge: `${config.icon} ${config.name}`,
-        text,
-      });
-    } catch (err) {
-      console.error(`Multi-agent: ${agentType} failed, skipping:`, err);
-      responses.push({
-        agent: agentType,
-        badge: `${config.icon} ${config.name}`,
-        text: `*${config.name} was unable to respond at this time.*`,
-      });
+    return textPromise;
+  });
+
+  const settledResults = await Promise.allSettled(agentPromises);
+
+  const responses = settledResults.map((result, i) => {
+    const agentType = classification.agents[i];
+    const config = AGENT_CONFIGS[agentType];
+    const badge = `${config.icon} ${config.name}`;
+
+    if (result.status === "fulfilled") {
+      return { agent: agentType, badge, text: result.value.text };
+    } else {
+      console.error(`Multi-agent: ${agentType} failed, skipping:`, result.reason);
+      return { agent: agentType, badge, text: `*${config.name} was unable to respond at this time.*` };
     }
-  }
+  });
 
   const combined = responses
     .map((r) => `**${r.badge}**\n\n${r.text}`)
