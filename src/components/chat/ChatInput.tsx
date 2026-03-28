@@ -174,29 +174,7 @@ export function ChatInput({
 
     // Image handling
     if (IMAGE_MIME_TYPES.includes(file.type)) {
-      if (imageAttachments.length >= MAX_IMAGES_PER_MESSAGE) {
-        return; // silently ignore if at limit
-      }
-      if (file.size > MAX_IMAGE_SIZE) {
-        setAttachments((prev) => [
-          ...prev,
-          { kind: "image", file, name: file.name, dataUrl: "", mediaType: file.type, error: "Image too large (max 10MB)" },
-        ]);
-        return;
-      }
-
-      try {
-        const dataUrl = await readImageAsDataUrl(file);
-        setAttachments((prev) => [
-          ...prev,
-          { kind: "image", file, name: file.name, dataUrl, mediaType: file.type },
-        ]);
-      } catch {
-        setAttachments((prev) => [
-          ...prev,
-          { kind: "image", file, name: file.name, dataUrl: "", mediaType: file.type, error: "Failed to read image" },
-        ]);
-      }
+      await addImageFiles([file]);
       return;
     }
 
@@ -209,6 +187,62 @@ export function ChatInput({
 
   const removeAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addImageFiles = async (files: File[]) => {
+    for (const file of files) {
+      if (!IMAGE_MIME_TYPES.includes(file.type)) continue;
+      if (imageAttachments.length >= MAX_IMAGES_PER_MESSAGE) break;
+      if (file.size > MAX_IMAGE_SIZE) {
+        setAttachments((prev) => [
+          ...prev,
+          { kind: "image", file, name: file.name, dataUrl: "", mediaType: file.type, error: "Image too large (max 10MB)" },
+        ]);
+        continue;
+      }
+      try {
+        const dataUrl = await readImageAsDataUrl(file);
+        setAttachments((prev) => [
+          ...prev,
+          { kind: "image", file, name: file.name, dataUrl, mediaType: file.type },
+        ]);
+      } catch {
+        setAttachments((prev) => [
+          ...prev,
+          { kind: "image", file, name: file.name, dataUrl: "", mediaType: file.type, error: "Failed to read image" },
+        ]);
+      }
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === "file" && IMAGE_MIME_TYPES.includes(item.type)) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      addImageFiles(imageFiles);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      IMAGE_MIME_TYPES.includes(f.type)
+    );
+    if (files.length > 0) addImageFiles(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -302,7 +336,11 @@ export function ChatInput({
           </div>
         )}
 
-        <div className="relative flex items-end rounded-xl border border-border bg-muted/30 focus-within:border-foreground/20 focus-within:bg-background transition-colors">
+        <div
+          className="relative flex items-end rounded-xl border border-border bg-muted/30 focus-within:border-foreground/20 focus-within:bg-background transition-colors"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
           {/* File upload button */}
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -328,6 +366,7 @@ export function ChatInput({
               setInput(e.target.value);
               handleInput();
             }}
+            onPaste={handlePaste}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
