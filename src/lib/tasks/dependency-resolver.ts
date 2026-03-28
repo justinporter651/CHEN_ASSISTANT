@@ -1,7 +1,7 @@
 import { TASK_GRAPH, TASK_MAP, type TaskDefinition } from "./task-graph";
 import { CATEGORIES } from "./categories";
 
-export type TaskStatus = "locked" | "available" | "in_progress" | "completed";
+export type TaskStatus = "available" | "in_progress" | "completed";
 
 export interface ResolvedTask extends TaskDefinition {
   status: TaskStatus;
@@ -21,10 +21,9 @@ export interface CategoryProgress {
  * Resolve the status of a single task.
  * Status is COMPUTED, never stored — this is a pure function.
  *
- *   completed  → task is in the completed set
- *   locked     → at least one dependency is not completed
- *   in_progress → all deps met AND task has chat messages
- *   available  → all deps met, no messages yet
+ *   completed   → task is in the completed set
+ *   in_progress → task has chat messages
+ *   available   → no messages yet
  */
 export function resolveStatus(
   task: TaskDefinition,
@@ -32,9 +31,6 @@ export function resolveStatus(
   tasksWithMessages: Set<string>
 ): TaskStatus {
   if (completedIds.has(task.id)) return "completed";
-
-  const allDepsMet = task.dependencies.every((dep) => completedIds.has(dep));
-  if (!allDepsMet) return "locked";
 
   if (tasksWithMessages.has(task.id)) return "in_progress";
 

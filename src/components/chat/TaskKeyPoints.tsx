@@ -10,7 +10,6 @@ import type { AgentType } from "@/lib/ai/types";
 import {
   CheckCircle2,
   Circle,
-  Lock,
   ArrowRight,
   FileText,
   Target,
@@ -173,7 +172,7 @@ export function TaskKeyPoints({ taskId, completedIds, collapsed }: TaskKeyPoints
               <div className="flex items-center gap-1.5 mb-1.5">
                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Unlocks
+                  Related
                 </span>
               </div>
               <ul className="space-y-1">
@@ -182,7 +181,7 @@ export function TaskKeyPoints({ taskId, completedIds, collapsed }: TaskKeyPoints
                     key={dep.id}
                     className="flex items-start gap-1.5 text-xs text-muted-foreground"
                   >
-                    <Lock className="h-3 w-3 mt-0.5 shrink-0" />
+                    <ArrowRight className="h-3 w-3 mt-0.5 shrink-0" />
                     <span>{dep.title}</span>
                   </li>
                 ))}

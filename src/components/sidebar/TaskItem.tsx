@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import type { ResolvedTask } from "@/lib/tasks/dependency-resolver";
-import { Check, Lock, Circle, Loader2 } from "lucide-react";
+import { Check, Circle, Loader2 } from "lucide-react";
 
 interface TaskItemProps {
   task: ResolvedTask;
@@ -30,13 +30,6 @@ const STATUS_CONFIG = {
     iconBg: "bg-zinc-100 dark:bg-zinc-800",
     clickable: true,
   },
-  locked: {
-    icon: Lock,
-    className: "text-zinc-300 dark:text-zinc-600",
-    bgClassName: "opacity-50",
-    iconBg: "bg-zinc-100 dark:bg-zinc-800",
-    clickable: false,
-  },
 };
 
 export function TaskItem({ task }: TaskItemProps) {
@@ -47,25 +40,19 @@ export function TaskItem({ task }: TaskItemProps) {
   const isActive = pathname === `/chat/${task.id}`;
 
   const handleClick = () => {
-    if (config.clickable) {
-      router.push(`/chat/${task.id}`);
-    }
+    router.push(`/chat/${task.id}`);
   };
 
   return (
     <button
       onClick={handleClick}
-      disabled={!config.clickable}
-      title={
-        task.status === "locked"
-          ? `Needs: ${task.blockers.join(", ")}`
-          : task.title
-      }
+      disabled={false}
+      title={task.title}
       className={`
         w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors
         ${config.bgClassName}
         ${isActive ? "ring-1 ring-blue-400 bg-blue-50 dark:bg-blue-950/40" : ""}
-        ${config.clickable ? "cursor-pointer" : "cursor-not-allowed"}
+        cursor-pointer
       `}
     >
       <div
@@ -79,9 +66,7 @@ export function TaskItem({ task }: TaskItemProps) {
         className={`truncate ${
           task.status === "completed"
             ? "line-through text-muted-foreground"
-            : task.status === "locked"
-              ? "text-muted-foreground/50"
-              : "text-foreground"
+            : "text-foreground"
         }`}
       >
         {task.title}

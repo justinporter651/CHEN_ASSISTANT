@@ -25,19 +25,14 @@ describe("resolveStatus", () => {
     expect(resolveStatus(task, new Set(["t1"]), new Set())).toBe("completed");
   });
 
-  it("returns 'locked' if any dependency is not completed", () => {
+  it("returns 'in_progress' if task has messages", () => {
     const task = makeTask({ id: "t2", dependencies: ["t1"] });
-    expect(resolveStatus(task, new Set(), new Set())).toBe("locked");
+    expect(resolveStatus(task, new Set(), new Set(["t2"]))).toBe("in_progress");
   });
 
-  it("returns 'in_progress' if all deps met and has messages", () => {
+  it("returns 'available' if task has no messages and is not completed", () => {
     const task = makeTask({ id: "t2", dependencies: ["t1"] });
-    expect(resolveStatus(task, new Set(["t1"]), new Set(["t2"]))).toBe("in_progress");
-  });
-
-  it("returns 'available' if all deps met but no messages", () => {
-    const task = makeTask({ id: "t2", dependencies: ["t1"] });
-    expect(resolveStatus(task, new Set(["t1"]), new Set())).toBe("available");
+    expect(resolveStatus(task, new Set(), new Set())).toBe("available");
   });
 
   it("returns 'available' for task with no dependencies", () => {
@@ -51,9 +46,9 @@ describe("resolveStatus", () => {
     expect(resolveStatus(task, new Set(["t1"]), new Set(["t1"]))).toBe("completed");
   });
 
-  it("handles undefined in completedIds set gracefully", () => {
+  it("returns 'available' for task with unmet dependencies (no locking)", () => {
     const task = makeTask({ id: "t1", dependencies: ["nonexistent"] });
-    expect(resolveStatus(task, new Set(), new Set())).toBe("locked");
+    expect(resolveStatus(task, new Set(), new Set())).toBe("available");
   });
 });
 
@@ -105,11 +100,10 @@ describe("getOverallProgress", () => {
 });
 
 describe("getAvailableTasks", () => {
-  it("returns foundation tasks when nothing is completed", () => {
+  it("returns all tasks when nothing is completed or in progress", () => {
     const available = getAvailableTasks(new Set(), new Set());
-    // Tasks with no dependencies should be available
+    // All tasks should be available since there's no locking
     expect(available.length).toBeGreaterThan(0);
-    expect(available.every((t) => t.dependencies.length === 0)).toBe(true);
   });
 
   it("excludes tasks that already have messages (in_progress)", () => {
