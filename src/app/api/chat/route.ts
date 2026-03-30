@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     const { message, taskId, attachments: rawAttachments } = await req.json();
 
-    if (!message || typeof message !== "string") {
+    if (typeof message !== "string") {
       return new Response("Message is required", { status: 400 });
     }
     if (!taskId || typeof taskId !== "string") {
@@ -66,6 +66,11 @@ export async function POST(req: Request) {
           )
           .slice(0, 4) // Max 4 images per message
       : [];
+
+    // Reject if there's no text AND no images
+    if (!message.trim() && attachments.length === 0) {
+      return new Response("Message or image is required", { status: 400 });
+    }
 
     const supabase = await createServiceClient();
     const clientId = await getClientId(req);
