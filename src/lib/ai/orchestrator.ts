@@ -20,30 +20,32 @@ import { selectKnowledge } from "./knowledge/loader";
 
 /**
  * Map task categories to their report/deliverable destinations.
+ * Used by the document-findings endpoint to tell students where work goes.
+ * NOT injected into normal chat responses.
  */
-const DELIVERABLE_DESTINATIONS: Record<string, string> = {
+export const DELIVERABLE_DESTINATIONS: Record<string, string> = {
   foundations:
-    "This foundational work feeds into: Introduction, Appendix 2 (background), Appendix 7 (thermo), or Appendix 4 (safety). It must be completed before downstream design tasks can proceed.",
+    "Introduction, Appendix 2 (background), Appendix 7 (thermo), or Appendix 4 (safety).",
   reactor:
-    "Reactor results go into: Results section (equipment specs table, process description), Discussion section (optimization justification with NPV comparisons). Key reactor parameters belong on a PowerPoint slide and are common Q&A topics.",
+    "Results section (equipment specs table, process description), Discussion section (optimization justification with NPV comparisons).",
   separation:
-    "Separation results go into: Results section (equipment specs, process description), Discussion section (optimization justification). Column performance data belongs in the equipment specs table.",
+    "Results section (equipment specs, process description), Discussion section (optimization justification).",
   "heat-exchange":
-    "Heat exchange results go into: Results section (utility specifications table itemized by equipment, equipment specs table). Heat integration discussion goes in the Discussion section.",
+    "Results section (utility specifications table itemized by equipment, equipment specs table). Heat integration discussion in Discussion section.",
   equipment:
-    "Equipment specifications go into: Results section (equipment specifications table with min/max design T and P, pipe class table). Materials of construction are noted in equipment specs.",
+    "Results section (equipment specifications table with min/max design T and P, pipe class table).",
   verification:
-    "Verification results confirm simulation validity. They feed into: Appendix 1 (Aspen report), and give confidence to all Results section data (stream tables, equipment specs).",
+    "Appendix 1 (Aspen report), stream tables, equipment specs.",
   economics:
-    "Economic results go into: Results section (NPV, Monte Carlo, break-even, cash flow table and diagrams, supplementary measures), Discussion section (economic justification), Conclusions (viability recommendation), and Abstract (key NPV number). NPV and Monte Carlo plots are high-impact PowerPoint slides.",
+    "Results section (NPV, Monte Carlo, break-even, cash flow table), Discussion section, Conclusions, Abstract (key NPV number).",
   safety:
-    "Safety analysis goes into: Appendix 4 (SDS summaries, Process Safety Data Summary table, both HAZOPs, inherently safer design review). Safety concerns also inform equipment specs (materials) and pipe class table. Safety is a common Q&A topic — prepare backup slides.",
+    "Appendix 4 (SDS summaries, Process Safety Data Summary table, HAZOPs, inherently safer design review).",
   report:
-    "This is direct report content for the Word document. Follow all formatting standards: passive voice, present tense, no first person, figures called out before they appear, recommendation framing.",
+    "Direct report content (Word document).",
   appendices:
-    "This appendix content goes directly into the Word document in the correct appendix order (1-7+). Ensure formatting matches the main report style.",
+    "Appendices in the Word document (order: 1-7+).",
   presentations:
-    "This content goes directly into PowerPoint slides, the poster, or speaker/Q&A preparation notes. Remember: slides should be brief, the speaker amplifies verbally. Poster must pass the 5-foot rule.",
+    "PowerPoint slides, poster, or Q&A preparation notes.",
 };
 
 /**
@@ -56,34 +58,16 @@ function buildTaskContext(taskId: string): string {
 
   const category = CATEGORY_MAP[task.category];
   const categoryLabel = category?.label ?? task.category;
-  const deliverableDest =
-    DELIVERABLE_DESTINATIONS[task.category] ??
-    "Connect this work to the appropriate report section or presentation material.";
-
-  // Find dependent tasks (what comes after this one)
-  const dependentTasks = Object.values(TASK_MAP).filter((t) =>
-    t.dependencies.includes(taskId)
-  );
-  const nextSteps =
-    dependentTasks.length > 0
-      ? dependentTasks.map((t) => `"${t.title}"`).join(", ")
-      : "No downstream tasks — this may be a final deliverable.";
 
   return `
-== ACTIVE DELIVERABLE ==
+== ACTIVE TASK ==
 TASK: "${task.title}"
 CATEGORY: ${categoryLabel}
 PRIMARY AGENT: ${task.agentType}
 OBJECTIVE: ${task.description}
 
-== WHERE THIS WORK GOES ==
-${deliverableDest}
-
-== WHAT COMES NEXT ==
-After this task is complete, it unlocks: ${nextSteps}
-
 == GUIDANCE ==
-The user is currently working on this deliverable. Walk them through it step by step. When they seem unsure or send a vague message, check in on where they are and guide them to the next concrete action. Always connect their work back to the final deliverables (report, PowerPoint, poster). Route technical questions to the appropriate specialist, defaulting to the primary agent (${task.agentType}) when the question is ambiguous.
+The user is currently working on this task. Focus on answering their question directly. When they seem unsure or send a vague message, check in on where they are and guide them to the next concrete action. Do NOT proactively tell them where this work goes in the report — they can use the "Document Findings" button for that. Route technical questions to the appropriate specialist, defaulting to the primary agent (${task.agentType}) when the question is ambiguous.
 `;
 }
 

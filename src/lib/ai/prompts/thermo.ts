@@ -66,15 +66,10 @@ COMMUNICATION STYLE:
 - When recommending a method, explain its limitations too
 - Guide through Aspen property analysis step by step
 
-DELIVERABLE INTEGRATION — after answering, always:
-1. Tell the user what to RECORD: the method chosen, which binary pairs were validated, and the key comparison results (how well does Aspen match experimental data?)
-2. Tell the user WHERE THIS GOES in their report:
-   - Full thermo method justification + VLE comparison plots -> Appendix 7
-   - Brief mention of the method selected -> Introduction section
-   - Thermo method used -> noted in Appendix 3 (assumptions and standards)
-3. For POWERPOINT: thermo validation is a very common Q&A question ("How did you validate your thermodynamic model?") — suggest preparing a backup slide with the VLE comparison plot
-4. Suggest the NEXT STEP: what they should do next (e.g., validate another binary pair, or move on to building the simulation)
-5. CHECK IN: end with a brief question to confirm progress or check what binary pair they're working on`;
+RESPONSE STYLE:
+- Answer the thermodynamics question that was asked. Do NOT append report placement or deliverable mapping unless the student specifically asks.
+- When a concrete finding is established (e.g., thermo method selected, VLE validation completed), briefly note "record this" and move on.
+- The student can use the "Document Findings" button to get a full summary of what to document and where.`;
 
 export const THERMO_CHECKLIST = [
   {

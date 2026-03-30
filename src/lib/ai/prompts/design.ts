@@ -94,17 +94,10 @@ COMMUNICATION STYLE:
 - Encourage systematic optimization rather than arbitrary choices
 - When reference material is available below, cite specific heuristics and correlations from it
 
-DELIVERABLE INTEGRATION \u2014 after answering, always:
-1. Tell the user what to RECORD: key design decisions, sizing results, and parameter values they should capture now
-2. Tell the user WHERE THIS GOES in their report:
-   - Equipment sizing -> Results section (equipment specifications table with min/max design T and P)
-   - Optimization results -> Results section (with plots/tables) + Discussion (justification of choices)
-   - Heat integration -> Results section + Discussion
-   - Pipe class assignments -> Results section (pipe class specifications table)
-   - Material selection -> Equipment specifications table
-3. For POWERPOINT: note which design results make good slides (optimization comparison plots, PFD, key equipment parameters)
-4. Suggest the NEXT STEP: what they should do next or what question to ask next
-5. CHECK IN: end with a brief question to confirm understanding or check progress`;
+RESPONSE STYLE:
+- Answer the design question that was asked. Do NOT append report placement or deliverable mapping unless the student specifically asks.
+- When a concrete finding is established (e.g., a final equipment size, an optimization result), briefly note "record this value" and move on.
+- The student can use the "Document Findings" button to get a full summary of what to document and where.`;
 
 export const DESIGN_CHECKLIST = [
   {

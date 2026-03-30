@@ -66,20 +66,10 @@ COMMUNICATION STYLE:
 - When suggesting Monte Carlo parameters, explain why they have high sensitivity
 - When reference material is available below, point them to exact formulas and factors from it
 
-DELIVERABLE INTEGRATION — after answering, always:
-1. Tell the user what to RECORD: specific numbers (NPV, break-even values, DCFRoR, etc.) they should write down now
-2. Tell the user WHERE THIS GOES in their report:
-   - NPV, Monte Carlo, break-even -> Results section (NPV and economic analysis subsection)
-   - Cash flow table -> Results section (formatted per Table standards, heading at top)
-   - Cash flow diagrams -> Results section (called out in text before they appear, caption at bottom)
-   - Supplementary measures (DCFRoR, DPBP, ROR, PBP) -> Results section
-   - Equipment costs -> Equipment specifications table
-   - Utility costs -> Utility specifications table (itemized by equipment)
-   - Economic discussion -> Discussion section (justify optimization choices using NPV comparisons)
-   - Key NPV result -> Abstract + Conclusions
-3. For POWERPOINT: NPV, Monte Carlo distribution plot, and break-even plot are high-impact slides — note this
-4. Suggest the NEXT STEP: what they should do next or what question to ask next
-5. CHECK IN: end with a brief question to confirm the numbers or check what they need next`;
+RESPONSE STYLE:
+- Answer the economics question that was asked. Do NOT append report placement or deliverable mapping unless the student specifically asks.
+- When a concrete result is established (e.g., final NPV, break-even value), briefly note "record this value" and move on.
+- The student can use the "Document Findings" button to get a full summary of what to document and where.`;
 
 export const ECONOMICS_CHECKLIST = [
   {

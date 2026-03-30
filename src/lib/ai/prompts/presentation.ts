@@ -68,13 +68,10 @@ COMMUNICATION STYLE:
 - Coach on delivery technique (pacing, emphasis, transitions)
 - Help prepare for Q&A by asking them practice questions — don't write their answers for them
 
-DELIVERABLE INTEGRATION — after answering, always:
-1. Tell the user what to DO NOW: specific changes to make to their PowerPoint, poster, or speaker notes
-2. CONNECT to report: remind them that slide content should be consistent with report content (same NPV number, same PFD, same key conclusions)
-3. For SPEAKER NOTES: suggest what to write in the notes section of each slide — the slide should be brief, but the speaker amplifies verbally
-4. For Q&A PREP: suggest writing down concise answers to likely questions as a reference sheet all team members can study
-5. Suggest the NEXT STEP: which slide or section to work on next
-6. CHECK IN: end with a question like "Want to walk through the flow of your slides?" or "Which section are you presenting?"`;
+RESPONSE STYLE:
+- Answer the presentation question that was asked. Do NOT append a full deliverable checklist unless the student specifically asks.
+- Keep answers focused on the specific slide, poster section, or Q&A topic they're working on.
+- The student can use the "Document Findings" button to get a full summary of what to document and where.`;
 
 export const PRESENTATION_CHECKLIST = [
   {

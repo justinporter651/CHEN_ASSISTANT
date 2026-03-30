@@ -14,7 +14,7 @@ import { TASK_MAP } from "@/lib/tasks/task-graph";
 import { CATEGORY_MAP } from "@/lib/tasks/categories";
 import { AGENT_CONFIGS } from "@/lib/ai/specialists";
 import type { AgentType } from "@/lib/ai/types";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, ClipboardList } from "lucide-react";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -27,7 +27,7 @@ interface ChatWindowProps {
 
 export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomplete }: ChatWindowProps) {
   const { user, displayName } = useAuth();
-  const { messages, isLoading, streamingContent, currentBadge, sendMessage, requestReview } =
+  const { messages, isLoading, streamingContent, currentBadge, sendMessage, requestReview, requestDocumentFindings } =
     useChat(taskId);
   const historyLoading = useChatStore((s) => s.historyLoading);
   const loadingStatus = useChatStore((s) => s.loadingStatus);
@@ -97,6 +97,16 @@ export function ChatWindow({ taskId, isCompleted, onMarkComplete, onMarkIncomple
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <AgentBadge agentType={task.agentType} size="sm" />
+            <Button
+              onClick={() => requestDocumentFindings(taskId)}
+              variant="outline"
+              size="sm"
+              disabled={isLoading || messages.length === 0}
+              className="shrink-0 gap-1.5 text-xs"
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              Document Findings
+            </Button>
             {(onMarkComplete || onMarkIncomplete) && (
               <CompletionButton
                 taskId={taskId}

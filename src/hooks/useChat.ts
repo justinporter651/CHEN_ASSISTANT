@@ -215,6 +215,80 @@ export function useChat(taskId: string) {
     ]
   );
 
+  /**
+   * Request a documentation summary that scans chat history and extracts
+   * findings that need to be documented in the report/presentation.
+   */
+  const requestDocumentFindings = useCallback(
+    async (docTaskId: string): Promise<void> => {
+      if (isLoading) return;
+
+      setLoading(true);
+      clearStreaming();
+      setLoadingStatus("reviewing");
+      setCurrentBadge("\uD83D\uDCCB Document Findings");
+
+      try {
+        const response = await fetch("/api/chat/document", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: docTaskId }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Document findings API error: ${response.status}`);
+        }
+
+        const fullContent = await readStream(response, appendStreamingContent);
+
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: fullContent,
+          agentType: response.headers.get("X-Agent-Type") || "writer",
+          badge: "\uD83D\uDCCB Document Findings",
+          createdAt: new Date().toISOString(),
+        });
+
+        clearStreaming();
+      } catch (error) {
+        console.error("Failed to generate document findings:", error);
+        const partialContent = useChatStore.getState().streamingContent;
+        if (partialContent) {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: partialContent + "\n\n_(Documentation scan was interrupted. Please try again.)_",
+            badge: "\uD83D\uDCCB Document Findings",
+            createdAt: new Date().toISOString(),
+          });
+        } else {
+          addMessage({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content:
+              "Sorry, the documentation scan failed. Please try again. " +
+              (error instanceof Error ? error.message : ""),
+            createdAt: new Date().toISOString(),
+          });
+        }
+        clearStreaming();
+      } finally {
+        setLoadingStatus(null);
+        setLoading(false);
+      }
+    },
+    [
+      isLoading,
+      addMessage,
+      setLoading,
+      setLoadingStatus,
+      appendStreamingContent,
+      setCurrentBadge,
+      clearStreaming,
+    ]
+  );
+
   return {
     messages,
     isLoading,
@@ -223,5 +297,6 @@ export function useChat(taskId: string) {
     currentBadge,
     sendMessage,
     requestReview,
+    requestDocumentFindings,
   };
 }
