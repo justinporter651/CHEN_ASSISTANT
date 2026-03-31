@@ -21,10 +21,9 @@ function rowToMessage(row: Record<string, unknown>) {
 }
 
 /**
- * Loads chat history from Supabase for a given task and subscribes
- * to realtime inserts. Fixes the race condition where setActiveTaskId
- * clears messages before history loads by loading history first,
- * then setting messages in one shot.
+ * Loads chat history from the server API for a given task and subscribes
+ * to realtime inserts. Uses the API route (which has the service role key)
+ * to bypass RLS, so messages are always readable regardless of RLS policies.
  */
 export function useRealtimeMessages(taskId: string | null) {
   const setMessages = useChatStore((s) => s.setMessages);
@@ -41,7 +40,7 @@ export function useRealtimeMessages(taskId: string | null) {
       return;
     }
 
-    // Skip DB calls when Supabase isn't configured
+    // Skip when Supabase isn't configured
     if (isPlaceholder) {
       setMessages([]);
       return;
@@ -53,26 +52,29 @@ export function useRealtimeMessages(taskId: string | null) {
       setHistoryLoading(true);
 
       try {
-        const { data, error } = await supabase
-          .from("task_messages")
-          .select("*")
-          .eq("task_id", taskId)
-          .order("created_at", { ascending: false })
-          .limit(PAGE_SIZE);
+        // Fetch history via API route (uses service role key, bypasses RLS)
+        const res = await fetch(
+          `/api/chat/history?taskId=${encodeURIComponent(taskId!)}&limit=${PAGE_SIZE}`
+        );
 
         // Don't update state if the taskId changed while we were loading
         if (cancelled || currentTaskIdRef.current !== taskId) return;
 
-        if (error) {
-          console.error("Failed to load chat history:", error);
+        if (!res.ok) {
+          console.error("Failed to load chat history:", res.status);
           setMessages([]);
           return;
         }
 
-        // Filter out internal system messages (e.g. context summaries) and map to chat shape
+        const { messages: data } = await res.json();
+
+        if (cancelled || currentTaskIdRef.current !== taskId) return;
+
+        // data comes in descending order from API — reverse to ascending,
+        // filter out internal system messages (e.g. context summaries)
         const messages = (data ?? [])
           .reverse()
-          .filter((row) => {
+          .filter((row: Record<string, unknown>) => {
             const meta = (row.metadata ?? {}) as Record<string, unknown>;
             return meta.type !== "context_summary";
           })
