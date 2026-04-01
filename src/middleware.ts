@@ -34,12 +34,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If not authenticated and not on a public route, redirect to login
+  // If not authenticated and not on a public route, redirect to login.
+  // API routes handle their own auth — never redirect them (breaks fetch).
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/auth/callback");
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
 
-  if (!user && !isPublicRoute) {
+  if (!user && !isPublicRoute && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

@@ -58,14 +58,15 @@ export const useChatStore = create<ChatState>((set) => ({
 
   addMessage: (message) =>
     set((state) => {
-      // Deduplicate: skip if same id OR same role+content already exists
-      // (the latter catches optimistic local adds vs realtime DB inserts)
+      // Deduplicate by ID, or by role+content for the LAST message only
+      // (catches optimistic local adds vs realtime DB inserts without
+      // blocking legitimate repeated messages further back in history)
+      if (state.messages.some((m) => m.id === message.id)) return state;
+      const last = state.messages[state.messages.length - 1];
       if (
-        state.messages.some(
-          (m) =>
-            m.id === message.id ||
-            (m.role === message.role && m.content === message.content)
-        )
+        last &&
+        last.role === message.role &&
+        last.content === message.content
       )
         return state;
       return { messages: [...state.messages, message] };
